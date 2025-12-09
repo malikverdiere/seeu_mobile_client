@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>fr</string>
+	<key>CFBundleDisplayName</key>
+	<string>SeeU</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.846057365263-5e3fuh0nkvsmi0jr46jplqloip70s17m</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>FacebookAppID</key>
+	<string>352956057581787</string>
+	<key>FacebookClientToken</key>
+	<string>567f3de66d155d9094ed348263377a68</string>
+	<key>FacebookDisplayName</key>
+	<string>SeeU</string>
+	<key>GIDClientID</key>
+	<string>582075048946-93fadvls7fli39f3uq2ttgoir1o4o176.apps.googleusercontent.com</string>
+	<key>LSApplicationCategoryType</key>
+	<string></string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>fbapi</string>
+		<string>fb-messenger-share-api</string>
+	</array>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NFCReaderUsageDescription</key>
+	<string>Vous avez besoin d'autoriser le NFC pour pouvoir ajouter vos points</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Do not change NSAllowsArbitraryLoads to true, or you will risk app rejection! -->
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>La caméra est nécessaire pour scanner les QRCodes</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>La localisation est nécessaire pour calculer la distance entre vous et les offres</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>La localisation est nécessaire pour calculer la distance entre vous et les offres</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>La localisation est nécessaire pour calculer la distance entre vous et les offres</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Le microsphone est nécessaire pour l'utilisation de la camera</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>La galerie est nécessaire pour ajouter des images comme la photo de profil ou les bannières de campagne.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Les notifications vous permettront d'être prévenue lorsqu'une nouvelle offre est disponible</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Cette application utilise des identifiants d'appareil pour suivre l'attribution marketing et l'utilisation de l'application. Vos données sont gardées confidentielles et ne sont pas partagées avec des tiers ou des partenaires publicitaires</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+	<key>UILaunchStoryboardName</key>
+	<string></string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+</dict>
+</plist>

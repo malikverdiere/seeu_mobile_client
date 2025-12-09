@@ -1,0 +1,142 @@
+{
+  "project_info": {
+    "project_number": "846057365263",
+    "project_id": "seeu-asia",
+    "storage_bucket": "seeu-asia.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:846057365263:android:3640a5e6cecaae26a7a87a",
+        "android_client_info": {
+          "package_name": "com.seeu.client"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "846057365263-astptsd9u7bfisjes9c0qjos65pmne07.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.seeu.client",
+            "certificate_hash": "2dec8ef6b7c671b626186df08ee09fde51ce3a82"
+          }
+        },
+        {
+          "client_id": "846057365263-je5tsqcdfibqamjbf78ga8snle88djll.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.seeu.client",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "846057365263-u3k5kt02736k455mrb9hgce5a07qor8j.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.seeu.client",
+            "certificate_hash": "41be2fa0a732da3f8d2087877abd755524174057"
+          }
+        },
+        {
+          "client_id": "846057365263-2hfi38vu782um9lotb1ubr7imi5rhrdn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXWkCrcdGlqtBZdZcm9Z3B4310oR6p17U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "846057365263-2hfi38vu782um9lotb1ubr7imi5rhrdn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "846057365263-5e3fuh0nkvsmi0jr46jplqloip70s17m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.SeeU.SeeUClient"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:846057365263:android:a0d4a42dc5c1869ba7a87a",
+        "android_client_info": {
+          "package_name": "com.seeuShopFlutter"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "846057365263-2hfi38vu782um9lotb1ubr7imi5rhrdn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXWkCrcdGlqtBZdZcm9Z3B4310oR6p17U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "846057365263-2hfi38vu782um9lotb1ubr7imi5rhrdn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "846057365263-5e3fuh0nkvsmi0jr46jplqloip70s17m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.SeeU.SeeUClient"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:846057365263:android:712935e475b56567a7a87a",
+        "android_client_info": {
+          "package_name": "com.seeushop"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "846057365263-2hfi38vu782um9lotb1ubr7imi5rhrdn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXWkCrcdGlqtBZdZcm9Z3B4310oR6p17U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "846057365263-2hfi38vu782um9lotb1ubr7imi5rhrdn.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "846057365263-5e3fuh0nkvsmi0jr46jplqloip70s17m.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.SeeU.SeeUClient"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,10 @@
+"CFBundleDisplayName"="SeeU";
+"CFBundleName"="SeeU";
+"NSCameraUsageDescription"="จำเป็นต้องใช้กล้องเพื่อสแกน QRCodes";
+"NSLocationAlwaysAndWhenInUseUsageDescription"="จำเป็นต้องใช้ตำแหน่งเพื่อคำนวณระยะทางระหว่างคุณกับข้อเสนอ";
+"NSLocationAlwaysUsageDescription"="จำเป็นต้องใช้ตำแหน่งเพื่อคำนวณระยะทางระหว่างคุณกับข้อเสนอ";
+"NSLocationWhenInUseUsageDescription"="จำเป็นต้องใช้ตำแหน่งเพื่อคำนวณระยะทางระหว่างคุณกับข้อเสนอ";
+"NSMicrophoneUsageDescription"="ต้องใช้ไมโครโฟนจึงจะใช้กล้องได้";
+"NSPhotoLibraryUsageDescription"="จำเป็นต้องมีแกลเลอรีเพื่อเพิ่มรูปภาพ เช่น รูปโปรไฟล์หรือแบนเนอร์แคมเปญ";
+"NSUserNotificationsUsageDescription"="การแจ้งเตือนจะช่วยให้คุณได้รับการแจ้งเตือนเมื่อมีข้อเสนอใหม่";
+"NSUserTrackingUsageDescription"="แอปนี้ใช้ตัวระบุอุปกรณ์เพื่อติดตามการกำหนดคุณลักษณะทางการตลาดและการใช้งานแอป ข้อมูลของคุณจะถูกเก็บไว้เป็นส่วนตัวและจะไม่แชร์กับบุคคลที่สามหรือพันธมิตรด้านการโฆษณา";

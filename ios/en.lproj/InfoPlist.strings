@@ -1,0 +1,10 @@
+"CFBundleDisplayName"="SeeU";
+"CFBundleName"="SeeU";
+"NSCameraUsageDescription"="Camera is required to scan QRCodes";
+"NSLocationAlwaysAndWhenInUseUsageDescription"="Location is needed to calculate the distance between you and the offers";
+"NSLocationAlwaysUsageDescription"="Location is needed to calculate the distance between you and the offers";
+"NSLocationWhenInUseUsageDescription"="Location is needed to calculate the distance between you and the offers";
+"NSMicrophoneUsageDescription"="Microphone is required for camera use";
+"NSPhotoLibraryUsageDescription"="The gallery is required to add images like profile picture or campaign banners.";
+"NSUserNotificationsUsageDescription"="Notifications will allow you to be notified when a new offer is available";
+"NSUserTrackingUsageDescription"="This app uses device identifiers to track marketing attribution and app usage. Your data is kept private and not shared with third parties or advertising partners";

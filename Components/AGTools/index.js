@@ -42,6 +42,9 @@ import {
     days,
     shopTypes,
     campaignTypes,
+    getShopTypeLabel,
+    shopTypeCategory,
+    shopCategoryType,
 } from "./AGGlobalVariables";
 import {
     StackNavigator,
@@ -91,4 +94,7 @@ export {
     InfiniteList,
     shopTypes,
     campaignTypes,
+    getShopTypeLabel,
+    shopTypeCategory,
+    shopCategoryType,
 }

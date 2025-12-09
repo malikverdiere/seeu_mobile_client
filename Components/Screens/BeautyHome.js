@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useCallback, useRef } from 'react';
+import React, { useContext, useEffect, useState, useCallback, useRef, memo } from 'react';
 import {
     View,
     Text,
@@ -6,624 +6,787 @@ import {
     TouchableOpacity,
     Image,
     FlatList,
-    TextInput,
     ScrollView,
-    ActivityIndicator,
     Dimensions,
     StatusBar,
-    SafeAreaView,
     RefreshControl,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NoUserContext, UserContext, goToScreen, primaryColor, setAppLang, traductor, shopTypes } from '../AGTools';
+import { NoUserContext, UserContext, goToScreen, primaryColor, setAppLang, traductor, getShopTypeLabel, bottomTarSpace } from '../AGTools';
 import { AuthContext } from '../Login';
-import { auth, firestore } from '../../firebase.config';
+import { firestore } from '../../firebase.config';
 import {
     collection,
     query,
     where,
     orderBy,
     limit,
-    startAfter,
     getDocs,
 } from '@react-native-firebase/firestore';
 
-// Images
+// ============ CONSTANTS ============
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const CARD_WIDTH = (SCREEN_WIDTH - 40 - 16) / 1.8;
+const CARD_GAP = 16;
+const CARD_IMAGE_HEIGHT = 105;
+const CARD_INFO_HEIGHT = 105;
+const ITEM_WIDTH = CARD_WIDTH + CARD_GAP;
+const RECENTLY_VIEWED_KEY = '@beauty_recently_viewed';
+
+// Images (cached at module level)
 const appIcon = require("../img/logo/defaultImg.png");
-const searchIcon = require("../img/btn/search.png");
-const filterIcon = require("../img/btn/filter.png");
-const arrowBackImg = require("../img/btn/arrowBack.png");
+const arrowBackImg = require("../img/arrow/arrowBackBg.png");
+const searchIcon = require("../img/search.png");
 const locationIcon = require("../img/btn/location.png");
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const SHOP_CARD_HEIGHT = 280;
-const ITEMS_PER_PAGE = 10;
+// ============ SHOP CARD COMPONENT (MEMOIZED) ============
+const ShopCard = memo(({ item, onPress, defaultIcon, lang }) => {
+    // Get translated shop type label using helper
+    const shopTypeLabel = getShopTypeLabel(item.shopTypeId, lang) || "Beauty";
 
-// Beauty subcategories for filter chips
-const BEAUTY_CATEGORIES = [
-    { id: "all", text: "All", textEn: "All", textTh: "ทั้งหมด" },
-    { id: "salon-de-coiffure", text: "Coiffure", textEn: "Hair salon", textTh: "ร้านทำผม" },
-    { id: "barbiers", text: "Barbiers", textEn: "Barbers", textTh: "ช่างตัดผม" },
-    { id: "instituts-de-beaute", text: "Beauté", textEn: "Beauty", textTh: "ความงาม" },
-    { id: "spa", text: "Spa", textEn: "Spa", textTh: "สปา" },
-    { id: "nail", text: "Nails", textEn: "Nails", textTh: "เล็บ" },
-    { id: "massage", text: "Massage", textEn: "Massage", textTh: "นวด" },
-];
+    return (
+        <TouchableOpacity
+            style={styles.shopCard}
+            onPress={() => onPress(item)}
+            activeOpacity={0.9}
+        >
+            <View style={styles.cardImageContainer}>
+                <Image
+                    source={{ uri: item.galleryImage || defaultIcon }}
+                    style={styles.cardImage}
+                    resizeMode="cover"
+                />
+                {item.promoText && (
+                    <View style={styles.promoBadge}>
+                        <Text style={styles.promoBadgeText} numberOfLines={1}>{item.promoText}</Text>
+                    </View>
+                )}
+            </View>
+            <View style={styles.cardInfo}>
+                <View style={styles.cardInfoContent}>
+                    <Text style={styles.shopName} numberOfLines={1}>{item.shopName}</Text>
+                    <View style={styles.ratingRow}>
+                        <Text style={styles.ratingText}>{item.rating?.toFixed(1) || "0.0"}</Text>
+                        <Text style={styles.starIcon}>★</Text>
+                        <Text style={styles.reviewsText}>({item.totalReviews || 0} Reviews)</Text>
+                    </View>
+                    <Text style={styles.locationText} numberOfLines={1}>{item.neighborhood}</Text>
+                </View>
+                <View style={styles.typeTag}>
+                    <Text style={styles.typeTagText}>{shopTypeLabel}</Text>
+                </View>
+            </View>
+        </TouchableOpacity>
+    );
+}, (prevProps, nextProps) => prevProps.item.id === nextProps.item.id);
 
-export default function BeautyHome({ navigation, route }) {
+// ============ SKELETON COMPONENTS ============
+const CardSkeleton = memo(() => (
+    <View style={styles.skeletonCard}>
+        <View style={styles.skeletonImage} />
+        <View style={styles.skeletonInfo}>
+            <View style={styles.skeletonLine} />
+            <View style={[styles.skeletonLine, { width: '60%' }]} />
+            <View style={[styles.skeletonLine, { width: '40%' }]} />
+        </View>
+    </View>
+));
+
+const BannerSkeleton = memo(() => (
+    <View style={styles.bannerContainer}>
+        <View style={styles.skeletonBanner} />
+    </View>
+));
+
+// ============ MAIN COMPONENT ============
+export default function BeautyHome({ navigation }) {
     const authContext = useContext(AuthContext);
-    const {
-        user,
-        noUserlocation,
-    } = useContext(authContext.user ? UserContext : NoUserContext);
+    const { user, noUserlocation } = useContext(authContext.user ? UserContext : NoUserContext);
+    const mountedRef = useRef(true);
 
-    const [searchText, setSearchText] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("all");
-    const [shops, setShops] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
-    const [lastDoc, setLastDoc] = useState(null);
-    const [hasMore, setHasMore] = useState(true);
+    // Loading states
+    const [loadingHighlights, setLoadingHighlights] = useState(true);
+    const [loadingRecent, setLoadingRecent] = useState(true);
+    const [loadingBanners, setLoadingBanners] = useState(true);
+
+    // Data states - filtered from highlights
+    const [promoShops, setPromoShops] = useState([]);
+    const [trendingShops, setTrendingShops] = useState([]);
+    const [massageShops, setMassageShops] = useState([]);
+    const [nailShops, setNailShops] = useState([]);
+    const [hairShops, setHairShops] = useState([]);
+    const [recentlyViewed, setRecentlyViewed] = useState([]);
+    const [banners, setBanners] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
 
     const insets = useSafeAreaInsets();
     const lang = setAppLang();
     const defaultIcon = Image.resolveAssetSource(appIcon).uri;
 
-    // Location
     const userLocation = user?.docData?.geolocation || noUserlocation;
-    const locationName = userLocation?.city || "Location";
+    const locationName = userLocation?.city || traductor("Current location");
 
-    // Get translated category text
-    const getCategoryText = (category) => {
-        if (lang === "th") return category.textTh || category.text;
-        if (lang === "en") return category.textEn || category.text;
-        return category.text;
-    };
-
-    // Fetch Beauty shops from Firestore
-    const fetchShops = async (isLoadMore = false, isRefresh = false) => {
-        if (isLoadMore && !hasMore) return;
-        if (isLoadMore) setLoadingMore(true);
-        else if (isRefresh) setRefreshing(true);
-        else setLoading(true);
-
-        try {
-            const shopsRef = collection(firestore, "Shops");
-            let constraints = [
-                where("shopValid", "==", true),
-                where("shopType.type", "==", 1), // 1 = beauty
-            ];
-
-            // Filter by subcategory if not "all"
-            if (selectedCategory !== "all") {
-                constraints.push(where("shop_type", "array-contains", selectedCategory));
-            }
-
-            // Order by rating
-            constraints.push(orderBy("google_infos.user_ratings_total", "desc"));
-            constraints.push(limit(ITEMS_PER_PAGE));
-
-            // Pagination
-            if (isLoadMore && lastDoc) {
-                constraints.push(startAfter(lastDoc));
-            }
-
-            const q = query(shopsRef, ...constraints);
-            const snapshot = await getDocs(q);
-
-            const newShops = snapshot.docs.map(docSnap => {
+    // ============ DATA TRANSFORMATION ============
+    const transformShopDoc = useCallback((docSnap) => {
                 const data = docSnap.data();
                 const galleryImage = Array.isArray(data.GalleryPictureShop) && data.GalleryPictureShop.length > 0
                     ? data.GalleryPictureShop[0]
-                    : null;
+            : data.cover_Shop_Img || data.logo_Shop_Img || null;
 
-                // Get shopType label
-                const shopTypeMatch = shopTypes.find(cat => cat.id === data.shopType?.id);
-                let shopTypeLabel = "";
-                if (shopTypeMatch) {
-                    if (lang === "th") shopTypeLabel = shopTypeMatch.textTh || shopTypeMatch.text || "";
-                    else if (lang === "fr") shopTypeLabel = shopTypeMatch.text || "";
-                    else shopTypeLabel = shopTypeMatch.textEn || shopTypeMatch.text || "";
+        let promoText = null;
+        if (data.promotion?.doubleDay && data.promotion?.promoCode) {
+            const currency = data.currency?.text || "฿";
+            if (data.promotion.type === 1) {
+                promoText = `${data.promotion.value}% off: ${data.promotion.promoCode}`;
+            } else if (data.promotion.type === 2) {
+                promoText = `${currency}${data.promotion.value} off: ${data.promotion.promoCode}`;
+            }
                 }
 
                 return {
                     id: docSnap.id,
                     shopName: data.shopName || "",
-                    galleryImage: galleryImage || data.cover_Shop_Img || data.logo_Shop_Img || null,
-                    logo: data.logo_Shop_Img || null,
+            galleryImage,
                     rating: data.google_infos?.rating || 0,
                     totalReviews: data.google_infos?.user_ratings_total || 0,
                     neighborhood: data.neighborhood || data.city || "",
-                    shopTypeLabel,
-                    promoLabel: data.promoLabel || null,
+            shopTypeId: data.shopType?.id,
+            shopTypeLabel: "Beauty",
+            promoText,
                     booking_id: data.booking_id || "",
-                    currency: data.currency?.text || "฿",
+        };
+    }, []);
+
+    // ============ FETCH HIGHLIGHTS (2 simple queries + client-side filter) ============
+    // Based on DOCUMENTATION_HOME_HIGHLIGHTS.md
+    // Query 1: highlight.isActive == true
+    // Query 2: promotion.doubleDay == true
+    // Then filter client-side by highlight.type
+    const fetchHighlights = useCallback(async () => {
+        setLoadingHighlights(true);
+        try {
+            const shopsRef = collection(firestore, "Shops");
+            
+            // 2 simple queries in parallel (no composite index needed)
+            const q1 = query(shopsRef, where("highlight.isActive", "==", true));
+            const q2 = query(shopsRef, where("promotion.doubleDay", "==", true));
+            
+            const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+            
+            if (!mountedRef.current) return;
+            
+            // Merge without duplicates (dedupe by ID)
+            const shopsMap = new Map();
+            [...snap1.docs, ...snap2.docs].forEach(docSnap => {
+                if (!shopsMap.has(docSnap.id)) {
+                    const data = docSnap.data();
+                    // Only include beauty shops (shopType.type == 1)
+                    if (data.shopType?.type === 1) {
+                        shopsMap.set(docSnap.id, { docSnap, data });
+                    }
+                }
+            });
+            
+            // Transform all shops
+            const allShops = Array.from(shopsMap.values()).map(({ docSnap, data }) => {
+                const galleryImage = Array.isArray(data.GalleryPictureShop) && data.GalleryPictureShop.length > 0
+                    ? data.GalleryPictureShop[0]
+                    : data.cover_Shop_Img || data.logo_Shop_Img || null;
+                
+                let promoText = null;
+                if (data.promotion?.doubleDay && data.promotion?.promoCode) {
+                    const currency = data.currency?.text || "฿";
+                    if (data.promotion.type === 1) {
+                        promoText = `${data.promotion.value}% off: ${data.promotion.promoCode}`;
+                    } else if (data.promotion.type === 2) {
+                        promoText = `${currency}${data.promotion.value} off: ${data.promotion.promoCode}`;
+                    }
+                }
+                
+                return {
+                    id: docSnap.id,
+                    shopName: data.shopName || "",
+                    galleryImage,
+                    rating: data.google_infos?.rating || 0,
+                    totalReviews: data.google_infos?.user_ratings_total || 0,
+                    neighborhood: data.neighborhood || data.city || "",
+                    shopTypeId: data.shopType?.id,
+                    promoText,
+                    booking_id: data.booking_id || "",
+                    // Keep raw data for filtering
+                    _highlightType: data.highlight?.type || null,
+                    _hasPromo: data.promotion?.doubleDay === true,
                 };
             });
-
-            // Update state
-            if (isLoadMore) {
-                setShops(prev => [...prev, ...newShops]);
-            } else {
-                setShops(newShops);
+            
+            // Prefetch first images
+            allShops.slice(0, 6).forEach(shop => {
+                if (shop.galleryImage) Image.prefetch(shop.galleryImage);
+            });
+            
+            // Filter by type (as per documentation)
+            const promo = allShops.filter(s => s._hasPromo).slice(0, 10);
+            const trending = allShops.filter(s => s._highlightType === "Trending").slice(0, 10);
+            const nail = allShops.filter(s => s._highlightType === "Nail studio").slice(0, 10);
+            const massage = allShops.filter(s => s._highlightType === "Massage salon").slice(0, 10);
+            const hair = allShops.filter(s => s._highlightType === "Hair salon").slice(0, 10);
+            
+            if (mountedRef.current) {
+                setPromoShops(promo);
+                setTrendingShops(trending);
+                setNailShops(nail);
+                setMassageShops(massage);
+                setHairShops(hair);
+                setLoadingHighlights(false);
             }
-
-            // Update pagination
-            if (snapshot.docs.length > 0) {
-                setLastDoc(snapshot.docs[snapshot.docs.length - 1]);
-            }
-            setHasMore(snapshot.docs.length === ITEMS_PER_PAGE);
-
         } catch (error) {
-            console.error("Error fetching beauty shops:", error);
-        } finally {
-            setLoading(false);
-            setLoadingMore(false);
-            setRefreshing(false);
+            console.error("Error fetching highlights:", error);
+            if (mountedRef.current) setLoadingHighlights(false);
         }
-    };
+    }, []);
 
-    // Reset and fetch when category changes
+    // Recently Viewed from AsyncStorage
+    const fetchRecentlyViewed = useCallback(async () => {
+        try {
+            const storedIds = await AsyncStorage.getItem(RECENTLY_VIEWED_KEY);
+            if (!storedIds) {
+                if (mountedRef.current) setLoadingRecent(false);
+                return;
+            }
+
+            const ids = JSON.parse(storedIds).slice(0, 10);
+            if (ids.length === 0) {
+                if (mountedRef.current) setLoadingRecent(false);
+                return;
+            }
+
+            const shopsRef = collection(firestore, "Shops");
+            // Fetch in batches of 10 (Firestore 'in' limit)
+            const batches = [];
+            for (let i = 0; i < ids.length; i += 10) {
+                batches.push(ids.slice(i, i + 10));
+            }
+
+            const results = [];
+            for (const batch of batches) {
+                const q = query(shopsRef, where("__name__", "in", batch));
+                const snapshot = await getDocs(q);
+                snapshot.docs.forEach(doc => results.push(transformShopDoc(doc)));
+            }
+
+            // Sort by original order
+            const orderedResults = ids
+                .map(id => results.find(r => r.id === id))
+                .filter(Boolean);
+
+            if (mountedRef.current) {
+                setRecentlyViewed(orderedResults);
+                setLoadingRecent(false);
+            }
+        } catch (error) {
+            if (mountedRef.current) setLoadingRecent(false);
+        }
+    }, [transformShopDoc]);
+
+    // Banners
+    const fetchBanners = useCallback(async () => {
+        try {
+            const bannersRef = collection(firestore, "SearchBanners");
+            const q = query(
+                bannersRef,
+                where("category", "==", "beauty"),
+                where("isActive", "==", true),
+                orderBy("priority", "asc"),
+                limit(3)
+            );
+            const snapshot = await getDocs(q);
+            
+            if (mountedRef.current) {
+                const bannersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setBanners(bannersData);
+                setLoadingBanners(false);
+                // Prefetch banner images
+                bannersData.forEach(b => {
+                    const url = b.banner?.[lang]?.url?.mobile || b.banner?.en?.url?.mobile;
+                    if (url) Image.prefetch(url);
+                });
+            }
+        } catch (error) {
+            if (mountedRef.current) setLoadingBanners(false);
+        }
+    }, [lang]);
+
+    // ============ FETCH ALL DATA ============
+    const fetchAllData = useCallback(async () => {
+        // All sections fetch in parallel
+        await Promise.all([
+            fetchHighlights(),
+            fetchRecentlyViewed(),
+            fetchBanners(),
+        ]);
+    }, [fetchHighlights, fetchRecentlyViewed, fetchBanners]);
+
+    // ============ EFFECTS ============
     useEffect(() => {
-        setShops([]);
-        setLastDoc(null);
-        setHasMore(true);
-        fetchShops();
-    }, [selectedCategory]);
+        mountedRef.current = true;
+        fetchAllData();
+        return () => { mountedRef.current = false; };
+    }, [fetchAllData]);
 
-    // Handle refresh
-    const onRefresh = useCallback(() => {
-        setLastDoc(null);
-        setHasMore(true);
-        fetchShops(false, true);
-    }, [selectedCategory]);
+    // ============ HANDLERS (MEMOIZED) ============
+    const onPressBack = useCallback(() => navigation.goBack(), [navigation]);
 
-    // Handle load more
-    const onLoadMore = () => {
-        if (!loadingMore && hasMore) {
-            fetchShops(true);
-        }
-    };
+    const onPressShop = useCallback((shop) => {
+        // Save to recently viewed
+        AsyncStorage.getItem(RECENTLY_VIEWED_KEY).then(stored => {
+            const ids = stored ? JSON.parse(stored) : [];
+            const filtered = ids.filter(id => id !== shop.id);
+            const updated = [shop.id, ...filtered].slice(0, 20);
+            AsyncStorage.setItem(RECENTLY_VIEWED_KEY, JSON.stringify(updated));
+        });
+        goToScreen(navigation, "Venue", { shopId: shop.id, booking_id: shop.booking_id });
+    }, [navigation]);
 
-    // Filter shops by search text
-    const filteredShops = searchText.trim()
-        ? shops.filter(shop =>
-            shop.shopName.toLowerCase().includes(searchText.toLowerCase()) ||
-            shop.neighborhood.toLowerCase().includes(searchText.toLowerCase())
-        )
-        : shops;
+    const onPressSearch = useCallback(() => {
+        goToScreen(navigation, "BeautySearch");
+    }, [navigation]);
 
-    // Navigate to shop
-    const onPressShop = (shop) => {
-        goToScreen(navigation, "Shop", { shopId: shop.id });
-    };
+    const onPressMore = useCallback((sectionId) => {
+        goToScreen(navigation, "Shops", { filter: sectionId, shopType: 1 });
+    }, [navigation]);
 
-    // Go back
-    const onPressBack = () => {
-        navigation.goBack();
-    };
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await fetchAllData();
+        setRefreshing(false);
+    }, [fetchAllData]);
 
-    // Go to location selection
-    const onPressLocation = () => {
-        StatusBar.setBarStyle("light-content", true);
-        goToScreen(navigation, "GeolocationView", { from: "BeautyHome" });
-    };
+    // ============ FLATLIST OPTIMIZATIONS ============
+    const getItemLayout = useCallback((_, index) => ({
+        length: ITEM_WIDTH,
+        offset: ITEM_WIDTH * index,
+        index,
+    }), []);
 
-    // Navigate to search page
-    const onPressSearch = () => {
-        goToScreen(navigation, "BeautySearch", { searchText });
-    };
+    const keyExtractor = useCallback((item) => item.id, []);
 
-    // Render header
-    const renderHeader = () => (
-        <View style={styles.header}>
+    const renderShopItem = useCallback(({ item }) => (
+        <ShopCard item={item} onPress={onPressShop} defaultIcon={defaultIcon} lang={lang} />
+    ), [onPressShop, defaultIcon, lang]);
+
+    // ============ RENDER HELPERS ============
+    const getBannerUrl = useCallback((banner, type = 'mobile') => {
+        if (!banner?.banner) return null;
+        const langBanner = banner.banner[lang] || banner.banner['en'] || banner.banner['th'];
+        return langBanner?.url?.[type] || null;
+    }, [lang]);
+
+    const renderHeroSection = () => (
+        <LinearGradient
+            colors={['#8FE8D8', '#E8F0F8', '#F0D8F8']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.heroContainer}
+        >
+            <View style={[styles.heroContent, { paddingTop: insets.top }]}>
+                <View style={styles.heroHeader}>
             <TouchableOpacity style={styles.backButton} onPress={onPressBack}>
                 <Image source={arrowBackImg} style={styles.backIcon} resizeMode="contain" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.locationButton} onPress={onPressLocation}>
-                <Image source={locationIcon} style={styles.locationIcon} resizeMode="contain" />
-                <Text style={styles.locationText} numberOfLines={1}>{locationName}</Text>
-                <View style={styles.chevronDown} />
-            </TouchableOpacity>
+                    <Text style={styles.heroTitle}>Beauty</Text>
             <View style={styles.headerSpacer} />
         </View>
-    );
-
-    // Render search bar
-    const renderSearchBar = () => (
-        <TouchableOpacity style={styles.searchContainer} onPress={onPressSearch} activeOpacity={0.8}>
-            <View style={styles.searchBar}>
-                <Image source={searchIcon} style={styles.searchIcon} resizeMode="contain" />
-                <Text style={styles.searchPlaceholder}>{traductor("Search beauty shops...")}</Text>
+                <View style={styles.sloganContainer}>
+                    <Text style={styles.sloganText}>Today's the day</Text>
+                    <Text style={styles.sloganText}>to treat yourself</Text>
+                </View>
+                <View style={styles.searchBox}>
+                    <TouchableOpacity style={styles.searchInput} onPress={onPressSearch}>
+                        <Image source={searchIcon} style={styles.inputIcon} resizeMode="contain" />
+                        <Text style={styles.inputText}>{traductor("All services")}</Text>
+                    </TouchableOpacity>
+                    <View style={styles.searchInput}>
+                        <Image source={locationIcon} style={styles.inputIcon} resizeMode="contain" />
+                        <Text style={styles.inputText} numberOfLines={1}>{locationName}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.searchButton} onPress={onPressSearch}>
+                        <Text style={styles.searchButtonText}>{traductor("Search Appointments")}</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
-            <TouchableOpacity style={styles.filterButton}>
-                <Image source={filterIcon} style={styles.filterIcon} resizeMode="contain" />
-            </TouchableOpacity>
-        </TouchableOpacity>
+        </LinearGradient>
     );
 
-    // Render category chips
-    const renderCategories = () => (
-        <View style={styles.categoriesContainer}>
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesScroll}
-            >
-                {BEAUTY_CATEGORIES.map((category) => {
-                    const isSelected = selectedCategory === category.id;
-                    return (
-                        <TouchableOpacity
-                            key={category.id}
-                            style={[
-                                styles.categoryChip,
-                                isSelected && styles.categoryChipSelected
-                            ]}
-                            onPress={() => setSelectedCategory(category.id)}
-                        >
-                            <Text style={[
-                                styles.categoryChipText,
-                                isSelected && styles.categoryChipTextSelected
-                            ]}>
-                                {getCategoryText(category)}
-                            </Text>
+    const renderSectionHeader = (title, onPressFn) => (
+        <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{title}</Text>
+            {onPressFn && (
+                <TouchableOpacity style={styles.moreButton} onPress={onPressFn}>
+                    <Text style={styles.moreText}>More</Text>
+                    <View style={styles.chevronRight} />
                         </TouchableOpacity>
-                    );
-                })}
-            </ScrollView>
+            )}
         </View>
     );
 
-    // Render shop card
-    const renderShopCard = ({ item }) => (
-        <TouchableOpacity
-            style={styles.shopCard}
-            onPress={() => onPressShop(item)}
-            activeOpacity={0.9}
-        >
-            <View style={styles.shopImageContainer}>
-                <Image
-                    source={{ uri: item.galleryImage || defaultIcon }}
-                    style={styles.shopImage}
-                    resizeMode="cover"
-                />
-                {item.promoLabel && (
-                    <View style={styles.promoBadge}>
-                        <Text style={styles.promoBadgeText}>{item.promoLabel}</Text>
-                    </View>
-                )}
-            </View>
-            <View style={styles.shopInfo}>
-                <Text style={styles.shopName} numberOfLines={1}>{item.shopName}</Text>
-                <View style={styles.ratingRow}>
-                    <Text style={styles.ratingText}>{item.rating?.toFixed(1) || "0.0"}</Text>
-                    <Text style={styles.starIcon}>★</Text>
-                    <Text style={styles.reviewsText}>({item.totalReviews || 0} Reviews)</Text>
+    const renderSection = (title, data, sectionId, isLoading) => {
+        if (isLoading) {
+            return (
+                <View style={styles.section}>
+                    {renderSectionHeader(title, null)}
+                    <FlatList
+                        data={[1, 2]}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalList}
+                        keyExtractor={(item) => `skeleton-${item}`}
+                        renderItem={() => <CardSkeleton />}
+                    />
                 </View>
-                <Text style={styles.locationText2} numberOfLines={1}>{item.neighborhood}</Text>
-                {item.shopTypeLabel ? (
-                    <View style={styles.typeTag}>
-                        <Text style={styles.typeTagText}>{item.shopTypeLabel}</Text>
-                    </View>
-                ) : null}
-            </View>
-        </TouchableOpacity>
-    );
+            );
+        }
 
-    // Render footer (loading more)
-    const renderFooter = () => {
-        if (!loadingMore) return null;
+        if (data.length === 0) return null;
+
         return (
-            <View style={styles.loadingMore}>
-                <ActivityIndicator color={primaryColor} />
+            <View style={styles.section}>
+                {renderSectionHeader(title, () => onPressMore(sectionId))}
+                <FlatList
+                    data={data}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.horizontalList}
+                    keyExtractor={keyExtractor}
+                    renderItem={renderShopItem}
+                    initialNumToRender={4}
+                    maxToRenderPerBatch={4}
+                    windowSize={3}
+                    removeClippedSubviews
+                    getItemLayout={getItemLayout}
+                />
             </View>
         );
     };
 
-    // Render empty state
-    const renderEmpty = () => {
-        if (loading) return null;
+    const renderBanner = (banner, index) => {
+        if (!banner) return null;
+        const imageUrl = getBannerUrl(banner, 'mobile');
+        if (!imageUrl) return null;
+
         return (
-            <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>{traductor("No beauty shops found")}</Text>
-                <Text style={styles.emptySubtext}>{traductor("Try changing your filters")}</Text>
+            <View key={`banner-${index}`} style={styles.bannerContainer}>
+                <TouchableOpacity onPress={() => {
+                    const redirectUrl = getBannerUrl(banner, 'redirect');
+                    // Handle redirect if needed
+                }}>
+                    <Image source={{ uri: imageUrl }} style={styles.bannerImage} resizeMode="cover" />
+                </TouchableOpacity>
             </View>
         );
     };
 
+    // ============ MAIN RENDER ============
     return (
         <View style={styles.container}>
-            <SafeAreaView style={styles.safeArea} />
-            <StatusBar barStyle="dark-content" />
+            <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: bottomTarSpace + insets.bottom + 20 }}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={primaryColor} />
+                }
+            >
+                {renderHeroSection()}
 
-            {renderHeader()}
-            {renderSearchBar()}
-            {renderCategories()}
+                <View style={styles.contentContainer}>
+                    {loadingBanners ? <BannerSkeleton /> : banners[0] && renderBanner(banners[0], 0)}
 
-            {loading ? (
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color={primaryColor} />
+                    {renderSection("Up to 50% off 🔥", promoShops, "promo", loadingHighlights)}
+                    {renderSection("Recently viewed", recentlyViewed, "recently", loadingRecent)}
+
+                    {loadingBanners ? <BannerSkeleton /> : banners[1] && renderBanner(banners[1], 1)}
+
+                    {renderSection("Massage salon", massageShops, "massage", loadingHighlights)}
+                    {renderSection("Nail studio", nailShops, "nail", loadingHighlights)}
+
+                    {loadingBanners ? <BannerSkeleton /> : banners[2] && renderBanner(banners[2], 2)}
+
+                    {renderSection("Hair Salon", hairShops, "hair", loadingHighlights)}
+                    {renderSection("Trending", trendingShops, "trending", loadingHighlights)}
                 </View>
-            ) : (
-                <FlatList
-                    data={filteredShops}
-                    renderItem={renderShopCard}
-                    keyExtractor={(item) => item.id}
-                    numColumns={2}
-                    columnWrapperStyle={styles.row}
-                    contentContainerStyle={[
-                        styles.listContent,
-                        { paddingBottom: insets.bottom + 20 }
-                    ]}
-                    showsVerticalScrollIndicator={false}
-                    onEndReached={onLoadMore}
-                    onEndReachedThreshold={0.5}
-                    ListFooterComponent={renderFooter}
-                    ListEmptyComponent={renderEmpty}
-                    refreshControl={
-                        <RefreshControl
-                            refreshing={refreshing}
-                            onRefresh={onRefresh}
-                            tintColor={primaryColor}
-                        />
-                    }
-                />
-            )}
+            </ScrollView>
         </View>
     );
 }
 
-const CARD_WIDTH = (SCREEN_WIDTH - 48) / 2;
-
+// ============ STYLES ============
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: "#FFFFFF",
     },
-    safeArea: {
-        backgroundColor: "#FFFFFF",
+    heroContainer: {
+        width: SCREEN_WIDTH,
+        height: 406,
     },
-
-    // Header
-    header: {
+    heroContent: {
+        flex: 1,
+        paddingHorizontal: 20,
+    },
+    heroHeader: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        justifyContent: "space-between",
+        height: 60,
     },
     backButton: {
         width: 40,
-        height: 40,
-        alignItems: "center",
+        height: 30,
         justifyContent: "center",
     },
     backIcon: {
-        width: 20,
-        height: 20,
-        tintColor: "#1D1D1B",
+        width: 40,
+        height: 30,
     },
-    locationButton: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 12,
-    },
-    locationIcon: {
-        width: 16,
-        height: 16,
-        tintColor: primaryColor,
-        marginRight: 6,
-    },
-    locationText: {
-        fontSize: 14,
+    heroTitle: {
+        fontSize: 20,
         fontWeight: "600",
-        color: "#1D1D1B",
-        maxWidth: 150,
-    },
-    chevronDown: {
-        width: 8,
-        height: 8,
-        borderRightWidth: 2,
-        borderBottomWidth: 2,
-        borderColor: "#1D1D1B",
-        transform: [{ rotate: "45deg" }],
-        marginLeft: 8,
-        marginTop: -2,
+        color: "#000000",
     },
     headerSpacer: {
         width: 40,
     },
-
-    // Search
-    searchContainer: {
-        flexDirection: "row",
-        paddingHorizontal: 16,
-        marginBottom: 16,
+    sloganContainer: {
+        marginTop: 20,
+        marginBottom: 15,
     },
-    searchBar: {
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#F5F5F5",
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        height: 48,
+    sloganText: {
+        fontSize: 20,
+        fontWeight: "600",
+        color: "#000000",
+        lineHeight: 28,
     },
-    searchIcon: {
-        width: 18,
-        height: 18,
-        tintColor: "#999",
-        marginRight: 10,
+    searchBox: {
+        backgroundColor: "#FFFFFF",
+        borderRadius: 17,
+        borderWidth: 3.5,
+        borderColor: "#A0F0E0",
+        padding: 13,
+        gap: 13,
     },
     searchInput: {
-        flex: 1,
-        fontSize: 15,
-        color: "#1D1D1B",
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#FFFFFF",
+        borderRadius: 9,
+        borderWidth: 0.9,
+        borderColor: "#D9D9D9",
+        height: 35,
+        paddingHorizontal: 9,
     },
-    searchPlaceholder: {
-        flex: 1,
-        fontSize: 15,
-        color: "#999",
+    inputIcon: {
+        width: 13,
+        height: 13,
+        tintColor: "#000000",
+        marginRight: 9,
     },
-    filterButton: {
-        width: 48,
-        height: 48,
-        backgroundColor: "#F5F5F5",
-        borderRadius: 12,
+    inputText: {
+        fontSize: 14,
+        fontWeight: "500",
+        color: "#000000",
+        flex: 1,
+    },
+    searchButton: {
+        backgroundColor: primaryColor,
+        borderRadius: 17,
+        height: 44,
         alignItems: "center",
         justifyContent: "center",
-        marginLeft: 10,
     },
-    filterIcon: {
-        width: 20,
-        height: 20,
-        tintColor: "#1D1D1B",
-    },
-
-    // Categories
-    categoriesContainer: {
-        marginBottom: 16,
-    },
-    categoriesScroll: {
-        paddingHorizontal: 16,
-    },
-    categoryChip: {
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        backgroundColor: "#F5F5F5",
-        borderRadius: 20,
-        marginRight: 8,
-    },
-    categoryChipSelected: {
-        backgroundColor: primaryColor,
-    },
-    categoryChipText: {
-        fontSize: 13,
-        fontWeight: "500",
-        color: "#1D1D1B",
-    },
-    categoryChipTextSelected: {
+    searchButtonText: {
+        fontSize: 14,
+        fontWeight: "600",
         color: "#FFFFFF",
     },
-
-    // List
-    listContent: {
-        paddingHorizontal: 16,
+    contentContainer: {
+        paddingTop: 20,
     },
-    row: {
+    section: {
+        marginBottom: 20,
+    },
+    sectionHeader: {
+        flexDirection: "row",
+        alignItems: "center",
         justifyContent: "space-between",
+        paddingHorizontal: 20,
         marginBottom: 16,
     },
-
-    // Shop Card
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#0F0E0E",
+    },
+    moreButton: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    moreText: {
+        fontSize: 14,
+        fontWeight: "500",
+        color: "#767881",
+        marginRight: 7,
+    },
+    chevronRight: {
+        width: 5,
+        height: 10,
+        borderRightWidth: 1.5,
+        borderTopWidth: 1.5,
+        borderColor: "#767881",
+        transform: [{ rotate: "45deg" }],
+    },
+    horizontalList: {
+        paddingHorizontal: 20,
+        gap: CARD_GAP,
+    },
     shopCard: {
         width: CARD_WIDTH,
         backgroundColor: "#FFFFFF",
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: "hidden",
-        borderWidth: 1,
-        borderColor: "#E5E5E5",
     },
-    shopImageContainer: {
+    cardImageContainer: {
         width: "100%",
-        height: 140,
+        height: CARD_IMAGE_HEIGHT,
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+        overflow: "hidden",
         position: "relative",
     },
-    shopImage: {
+    cardImage: {
         width: "100%",
         height: "100%",
     },
     promoBadge: {
         position: "absolute",
-        top: 8,
-        left: 8,
-        right: 8,
+        top: 9,
+        left: 9,
+        right: 9,
         backgroundColor: primaryColor,
         borderRadius: 8,
-        paddingVertical: 4,
-        paddingHorizontal: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 11,
+        flexDirection: "row",
+        alignItems: "center",
     },
     promoBadgeText: {
         color: "#FFFFFF",
-        fontSize: 10,
-        fontWeight: "600",
-        textAlign: "center",
+        fontSize: 11,
+        fontWeight: "500",
     },
-    shopInfo: {
-        padding: 12,
+    cardInfo: {
+        minHeight: CARD_INFO_HEIGHT,
+        borderWidth: 1,
+        borderTopWidth: 0,
+        borderColor: "#D9D9D9",
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+        padding: 10,
+        paddingBottom: 12,
+        justifyContent: "space-between",
+    },
+    cardInfoContent: {
+        gap: 4,
     },
     shopName: {
         fontSize: 14,
         fontWeight: "600",
-        color: "#1D1D1B",
-        marginBottom: 4,
+        color: "#000000",
     },
     ratingRow: {
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 4,
+        gap: 2,
     },
     ratingText: {
         fontSize: 12,
         fontWeight: "500",
-        color: "#1D1D1B",
+        color: "#000000",
     },
     starIcon: {
-        fontSize: 11,
+        fontSize: 10,
         color: "#FFD700",
-        marginHorizontal: 3,
+        marginHorizontal: 2,
     },
     reviewsText: {
-        fontSize: 11,
-        color: "#666",
-    },
-    locationText2: {
         fontSize: 12,
-        color: "#666",
-        marginBottom: 8,
+        fontWeight: "500",
+        color: "#000000",
+        marginLeft: 4,
+    },
+    locationText: {
+        fontSize: 12,
+        fontWeight: "500",
+        color: "#747676",
     },
     typeTag: {
         alignSelf: "flex-start",
-        backgroundColor: "#F5F5F5",
-        borderRadius: 6,
-        paddingVertical: 4,
-        paddingHorizontal: 8,
+        borderWidth: 1,
+        borderColor: "#D9D9D9",
+        borderRadius: 8,
+        paddingVertical: 5,
+        paddingHorizontal: 7,
+        backgroundColor: "#FFFFFF",
+        marginTop: 8,
     },
     typeTagText: {
         fontSize: 10,
         fontWeight: "500",
-        color: "#666",
+        color: "#000000",
     },
-
-    // Loading
-    loadingContainer: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
+    bannerContainer: {
+        paddingHorizontal: 20,
+        marginBottom: 20,
     },
-    loadingMore: {
-        paddingVertical: 20,
-        alignItems: "center",
+    bannerImage: {
+        width: "100%",
+        height: 183,
+        borderRadius: 12,
     },
-
-    // Empty
-    emptyContainer: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 60,
+    skeletonCard: {
+        width: CARD_WIDTH,
+        backgroundColor: "#FFFFFF",
+        borderRadius: 8,
+        overflow: "hidden",
     },
-    emptyText: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#1D1D1B",
-        marginBottom: 8,
+    skeletonImage: {
+        width: "100%",
+        height: CARD_IMAGE_HEIGHT,
+        backgroundColor: "#E5E5E5",
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
     },
-    emptySubtext: {
-        fontSize: 14,
-        color: "#666",
+    skeletonInfo: {
+        padding: 10,
+        gap: 8,
+        borderWidth: 1,
+        borderTopWidth: 0,
+        borderColor: "#E5E5E5",
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+        minHeight: CARD_INFO_HEIGHT,
+    },
+    skeletonLine: {
+        height: 12,
+        backgroundColor: "#E5E5E5",
+        borderRadius: 4,
+        width: '80%',
+    },
+    skeletonBanner: {
+        width: "100%",
+        height: 183,
+        backgroundColor: "#E5E5E5",
+        borderRadius: 12,
     },
 });
-

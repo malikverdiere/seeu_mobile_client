@@ -37,6 +37,8 @@ import ChatRoom from "../Chat/ChatRoom";
 import NotifsChatRooms from "../Screens/NotifsChatRooms";
 import LogHome from "../Login/LogHome";
 import BeautyHome from "../Screens/BeautyHome";
+import BeautySearch from "../Screens/BeautySearch";
+import Venue from "../Screens/Venue";
 
 const underline = require("../img/underline.png")
 const tabActionImg = require("../img/btn/tabAction.png")
@@ -69,6 +71,8 @@ const tabNone = [
     "NotifsChatRooms",
     "LogHome",
     "BeautyHome",
+    "BeautySearch",
+    "Venue",
 ]
 
 // changeTransition
@@ -186,6 +190,8 @@ export const StackHome = ({ navigation, route }) => {
         <Stack.Navigator initialRouteName="Home" screenOptions={{}}>
             <Stack.Screen name="Home" component={Home} options={{headerShown:false}} />
             <Stack.Screen name="BeautyHome" component={BeautyHome} options={{headerShown:false}} />
+            <Stack.Screen name="BeautySearch" component={BeautySearch} options={{headerShown:false}} />
+            <Stack.Screen name="Venue" component={Venue} options={{headerShown:false}} />
             <Stack.Screen name="CampaignsList" component={CampaignsList} options={{headerShown:false}} />
             <Stack.Screen name="Campaign" component={Campaign} options={{headerShown:false}} />
             <Stack.Screen name="TicketsQrCode" component={TicketsQrCode} options={{headerShown:false}} />

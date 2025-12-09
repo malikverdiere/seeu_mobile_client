@@ -5,9 +5,10 @@ import { NavigationContainer, useNavigationContainerRef } from '@react-navigatio
 import { AuthContext } from './Login';
 import { requestTrackingPermission } from 'react-native-tracking-transparency';
 import SplashScreen from './SplashScreen';
-import { LogLevel, initialize, setCurrentScreenName } from 'react-native-clarity';
+// Clarity désactivé temporairement
+// import { LogLevel, initialize, setCurrentScreenName } from 'react-native-clarity';
+// import { CLARITY_KEY } from '@env';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { CLARITY_KEY } from '@env';
 
 export default function LandingView() {
     const {
@@ -33,15 +34,16 @@ export default function LandingView() {
         }
     }, [])
 
-    const clarityConfig = {
-        logLevel: LogLevel.Verbose,
-    }
+    // Clarity désactivé temporairement
+    // const clarityConfig = {
+    //     logLevel: LogLevel.Verbose,
+    // }
 
-    useEffect(() => {
-        if (Platform.OS === 'android') {
-            initialize(CLARITY_KEY, clarityConfig)
-        }
-    }, [])
+    // useEffect(() => {
+    //     if (Platform.OS === 'android') {
+    //         initialize(CLARITY_KEY, clarityConfig)
+    //     }
+    // }, [])
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -78,7 +80,8 @@ export default function LandingView() {
                 <NavigationContainer ref={navigationRef}
                     onReady={() => {
                         routeNameRef.current = navigationRef.getCurrentRoute().name
-                        setCurrentScreenName(routeNameRef.current)
+                        // Clarity désactivé temporairement
+                        // setCurrentScreenName(routeNameRef.current)
                     }}
                     onStateChange={() => {
                         const previousRouteName = routeNameRef.current
@@ -86,7 +89,8 @@ export default function LandingView() {
 
                         if (previousRouteName !== currentRouteName) {
                             routeNameRef.current = currentRouteName
-                            setCurrentScreenName(currentRouteName)
+                            // Clarity désactivé temporairement
+                            // setCurrentScreenName(currentRouteName)
                         }
                     }}
                 >

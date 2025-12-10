@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useCallback, useRef, memo } from 'react';
+import React, { useContext, useEffect, useState, useCallback, useRef, memo, useMemo } from 'react';
 import {
     View,
     Text,
@@ -14,7 +14,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NoUserContext, UserContext, goToScreen, primaryColor, setAppLang, traductor, getShopTypeLabel, bottomTarSpace } from '../AGTools';
+import { NoUserContext, UserContext, goToScreen, primaryColor, setAppLang, traductor, getShopTypeLabel, bottomTarSpace, shopTypes } from '../AGTools';
 import { AuthContext } from '../Login';
 import { firestore } from '../../firebase.config';
 import {
@@ -40,6 +40,9 @@ const appIcon = require("../img/logo/defaultImg.png");
 const arrowBackImg = require("../img/arrow/arrowBackBg.png");
 const searchIcon = require("../img/search.png");
 const locationIcon = require("../img/btn/location.png");
+
+// Beauty categories (type: 1)
+const BEAUTY_CATEGORIES = shopTypes.filter(s => s.type === 1 && s.id !== "0-default");
 
 // ============ SHOP CARD COMPONENT (MEMOIZED) ============
 const ShopCard = memo(({ item, onPress, defaultIcon, lang }) => {
@@ -100,6 +103,26 @@ const BannerSkeleton = memo(() => (
     </View>
 ));
 
+// ============ CATEGORY DROPDOWN ITEM ============
+const CategoryItem = memo(({ item, isSelected, onPress, lang }) => {
+    const label = lang === "th" ? (item.textTh || item.text) 
+        : lang === "fr" ? item.text 
+        : (item.textEn || item.text);
+    
+    return (
+        <TouchableOpacity 
+            style={[styles.categoryItem, isSelected && styles.categoryItemSelected]} 
+            onPress={() => onPress(item)}
+            activeOpacity={0.8}
+        >
+            <Text style={[styles.categoryItemText, isSelected && styles.categoryItemTextSelected]}>
+                {label}
+            </Text>
+            {isSelected && <Text style={styles.checkmark}>✓</Text>}
+        </TouchableOpacity>
+    );
+});
+
 // ============ MAIN COMPONENT ============
 export default function BeautyHome({ navigation }) {
     const authContext = useContext(AuthContext);
@@ -120,6 +143,8 @@ export default function BeautyHome({ navigation }) {
     const [recentlyViewed, setRecentlyViewed] = useState([]);
     const [banners, setBanners] = useState([]);
     const [refreshing, setRefreshing] = useState(false);
+    const [categoryDropdownVisible, setCategoryDropdownVisible] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState(null); // null = All services
 
     const insets = useSafeAreaInsets();
     const lang = setAppLang();
@@ -350,8 +375,26 @@ export default function BeautyHome({ navigation }) {
     }, [navigation]);
 
     const onPressSearch = useCallback(() => {
-        goToScreen(navigation, "BeautySearch");
-    }, [navigation]);
+        goToScreen(navigation, "BeautySearch", selectedCategory ? { category: selectedCategory.id } : {});
+    }, [navigation, selectedCategory]);
+    
+    const onSelectCategory = useCallback((cat) => {
+        setSelectedCategory(cat?.id === "all" ? null : cat);
+        setCategoryDropdownVisible(false);
+    }, []);
+    
+    // Selected category label
+    const selectedCategoryLabel = useMemo(() => {
+        if (!selectedCategory) {
+            // Use same translations as BeautySearch
+            return lang === "th" ? "บริการทั้งหมด" 
+                : lang === "fr" ? "Tous les services"
+                : "All services";
+        }
+        return lang === "th" ? (selectedCategory.textTh || selectedCategory.text)
+            : lang === "fr" ? selectedCategory.text
+            : (selectedCategory.textEn || selectedCategory.text);
+    }, [selectedCategory, lang]);
 
     const onPressMore = useCallback((sectionId) => {
         goToScreen(navigation, "Shops", { filter: sectionId, shopType: 1 });
@@ -383,6 +426,35 @@ export default function BeautyHome({ navigation }) {
         return langBanner?.url?.[type] || null;
     }, [lang]);
 
+    // ============ RENDER CATEGORY DROPDOWN ============
+    const renderCategoryDropdown = () => {
+        if (!categoryDropdownVisible) return null;
+        
+        return (
+            <View style={styles.dropdownContainer}>
+                <ScrollView style={styles.dropdownList} nestedScrollEnabled>
+                    {/* All Services option */}
+                    <CategoryItem 
+                        item={{ id: "all", text: "Tous les services", textEn: "All services", textTh: "บริการทั้งหมด" }}
+                        isSelected={!selectedCategory}
+                        onPress={() => onSelectCategory({ id: "all" })}
+                        lang={lang}
+                    />
+                    {/* Beauty categories */}
+                    {BEAUTY_CATEGORIES.map(cat => (
+                        <CategoryItem 
+                            key={cat.id}
+                            item={cat}
+                            isSelected={selectedCategory?.id === cat.id}
+                            onPress={onSelectCategory}
+                            lang={lang}
+                        />
+                    ))}
+                </ScrollView>
+            </View>
+        );
+    };
+
     const renderHeroSection = () => (
         <LinearGradient
             colors={['#8FE8D8', '#E8F0F8', '#F0D8F8']}
@@ -403,16 +475,28 @@ export default function BeautyHome({ navigation }) {
                     <Text style={styles.sloganText}>to treat yourself</Text>
                 </View>
                 <View style={styles.searchBox}>
-                    <TouchableOpacity style={styles.searchInput} onPress={onPressSearch}>
-                        <Image source={searchIcon} style={styles.inputIcon} resizeMode="contain" />
-                        <Text style={styles.inputText}>{traductor("All services")}</Text>
-                    </TouchableOpacity>
+                    <View style={styles.categoryInputContainer}>
+                        <TouchableOpacity 
+                            style={styles.searchInput} 
+                            onPress={() => setCategoryDropdownVisible(!categoryDropdownVisible)}
+                            activeOpacity={0.9}
+                        >
+                            <Image source={searchIcon} style={styles.inputIcon} resizeMode="contain" />
+                            <Text style={styles.inputText}>{selectedCategoryLabel}</Text>
+                            <View style={styles.chevronDown} />
+                        </TouchableOpacity>
+                        {renderCategoryDropdown()}
+                    </View>
                     <View style={styles.searchInput}>
                         <Image source={locationIcon} style={styles.inputIcon} resizeMode="contain" />
                         <Text style={styles.inputText} numberOfLines={1}>{locationName}</Text>
                     </View>
                     <TouchableOpacity style={styles.searchButton} onPress={onPressSearch}>
-                        <Text style={styles.searchButtonText}>{traductor("Search Appointments")}</Text>
+                        <Text style={styles.searchButtonText}>
+                            {lang === "th" ? "ค้นหา" 
+                                : lang === "fr" ? "Rechercher"
+                                : "Search"}
+                        </Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -788,5 +872,63 @@ const styles = StyleSheet.create({
         height: 183,
         backgroundColor: "#E5E5E5",
         borderRadius: 12,
+    },
+    categoryInputContainer: {
+        position: "relative",
+    },
+    chevronDown: {
+        width: 8,
+        height: 8,
+        borderRightWidth: 2,
+        borderBottomWidth: 2,
+        borderColor: "#000000",
+        transform: [{ rotate: "45deg" }],
+        marginLeft: 8,
+    },
+    dropdownContainer: {
+        position: "absolute",
+        top: 40,
+        left: 0,
+        right: 0,
+        backgroundColor: "#FFFFFF",
+        borderWidth: 1,
+        borderColor: "#D9D9D9",
+        borderRadius: 9,
+        maxHeight: 300,
+        zIndex: 1000,
+        elevation: 5,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+    },
+    dropdownList: {
+        maxHeight: 300,
+    },
+    categoryItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 15,
+        paddingHorizontal: 15,
+        borderRadius: 10,
+        marginBottom: 5,
+    },
+    categoryItemSelected: {
+        backgroundColor: "#F0EEFF",
+    },
+    categoryItemText: {
+        fontSize: 16,
+        fontWeight: "500",
+        color: "#000000",
+    },
+    categoryItemTextSelected: {
+        color: primaryColor,
+        fontWeight: "600",
+    },
+    checkmark: {
+        fontSize: 16,
+        color: primaryColor,
+        fontWeight: "600",
     },
 });

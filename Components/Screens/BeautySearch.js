@@ -255,7 +255,17 @@ export default function BeautySearch({ navigation, route }) {
     const [hasMore, setHasMore] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
-    const [selectedCategory, setSelectedCategory] = useState(null); // null = All services
+    
+    // Initialize selectedCategory from route params if provided
+    const categoryFromRoute = route?.params?.category;
+    const initialCategory = useMemo(() => {
+        if (categoryFromRoute && categoryFromRoute !== 'beauty') {
+            return BEAUTY_CATEGORIES.find(cat => cat.id === categoryFromRoute) || null;
+        }
+        return null;
+    }, [categoryFromRoute]);
+    
+    const [selectedCategory, setSelectedCategory] = useState(initialCategory); // null = All services
     
     // Filters - nearMe disabled by default
     const [filters, setFilters] = useState({
@@ -271,7 +281,7 @@ export default function BeautySearch({ navigation, route }) {
     const insets = useSafeAreaInsets();
     const lang = setAppLang();
     const defaultIcon = Image.resolveAssetSource(appIcon).uri;
-    const category = route?.params?.category || 'beauty';
+    const category = categoryFromRoute || 'beauty';
     
     // categoryType: use shopTypes.type if category is a subcategory, else use shopCategoryType
     // Ex: "beauty" → shopCategoryType("beauty") = 1
@@ -309,7 +319,7 @@ export default function BeautySearch({ navigation, route }) {
             const bannersRef = collection(firestore, "SearchBanners");
             const q = query(
                 bannersRef,
-                where("category", "==", category),
+                where("category", "==", "beauty"),
                 where("isActive", "==", true),
                 orderBy("priority", "asc")
             );
@@ -335,7 +345,7 @@ export default function BeautySearch({ navigation, route }) {
         } finally {
             if (mountedRef.current) setLoadingBanners(false);
         }
-    }, [category, lang]);
+    }, [lang]);
 
     // ============ TRACK BANNER CLICK ============
     const trackBannerClick = useCallback(async (bannerId) => {
@@ -526,6 +536,19 @@ export default function BeautySearch({ navigation, route }) {
         fetchShops();
         return () => { mountedRef.current = false; };
     }, []);
+
+    // Update selectedCategory when route params change
+    useEffect(() => {
+        if (categoryFromRoute && categoryFromRoute !== 'beauty') {
+            const foundCategory = BEAUTY_CATEGORIES.find(cat => cat.id === categoryFromRoute);
+            if (foundCategory && foundCategory.id !== selectedCategory?.id) {
+                setSelectedCategory(foundCategory);
+            }
+        } else if (!categoryFromRoute && selectedCategory !== null) {
+            // Reset to "All services" if no category in params
+            setSelectedCategory(null);
+        }
+    }, [categoryFromRoute]);
 
     // ============ FILTER/CATEGORY CHANGE ============
     useEffect(() => {

@@ -204,7 +204,7 @@ const BannerCarousel = memo(({ banners, onPressBanner, defaultIcon }) => {
         <TouchableOpacity 
             style={styles.bannerContainer}
             onPress={() => onPressBanner(item)}
-            disabled={!item.redirectUrl && item.legacy && item.docData?.pressable === false}
+            disabled={!item.shopId && !item.redirectUrl && item.legacy && item.docData?.pressable === false}
             activeOpacity={0.9}
         >
             <Image 
@@ -483,6 +483,7 @@ export default function Home({ navigation }) {
                     id: docSnap.id,
                     imageUrl: bannerData.url?.mobile || bannerData.url?.desktop || null,
                     redirectUrl: bannerData.url?.redirect || null,
+                    shopId: data.shopId || null,
                     priority: data.priority || 0,
                         };
                     }).filter(b => b.imageUrl);
@@ -504,6 +505,7 @@ export default function Home({ navigation }) {
                     id: docSnap.id,
                     imageUrl: bannerData.url?.mobile || bannerData.url?.desktop || null,
                     redirectUrl: bannerData.url?.redirect || null,
+                    shopId: data.shopId || null,
                     priority: data.priority || 0,
                 };
             }).filter(b => b.imageUrl);
@@ -648,7 +650,9 @@ export default function Home({ navigation }) {
     }, [navigation]);
 
     const onPressBanner = useCallback((item) => {
-        if (item.redirectUrl) {
+        if (item.shopId) {
+            goToScreen(navigation, "Venue", { shopId: item.shopId });
+        } else if (item.redirectUrl) {
             Linking.openURL(item.redirectUrl);
         } else if (item.legacy && item.docData?.pressable !== false) {
             goToScreen(navigation, "Campaign", { 

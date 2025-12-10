@@ -40,6 +40,7 @@ const appIcon = require("../img/logo/defaultImg.png");
 const arrowBackImg = require("../img/arrow/arrowBackBg.png");
 const searchIcon = require("../img/search.png");
 const locationIcon = require("../img/btn/location.png");
+const promoIcon = require("../img/ticket.png");
 
 // Beauty categories (type: 1)
 const BEAUTY_CATEGORIES = shopTypes.filter(s => s.type === 1 && s.id !== "0-default");
@@ -61,9 +62,10 @@ const ShopCard = memo(({ item, onPress, defaultIcon, lang }) => {
                     style={styles.cardImage}
                     resizeMode="cover"
                 />
-                {item.promoText && (
+                {item.promoLabel && (
                     <View style={styles.promoBadge}>
-                        <Text style={styles.promoBadgeText} numberOfLines={1}>{item.promoText}</Text>
+                        {/*<Image source={promoIcon} style={styles.promoIconBadge} resizeMode="contain" />*/}
+                        <Text style={styles.promoBadgeText} numberOfLines={1}>{item.promoLabel}</Text>
                     </View>
                 )}
             </View>
@@ -160,16 +162,6 @@ export default function BeautyHome({ navigation }) {
                     ? data.GalleryPictureShop[0]
             : data.cover_Shop_Img || data.logo_Shop_Img || null;
 
-        let promoText = null;
-        if (data.promotion?.doubleDay && data.promotion?.promoCode) {
-            const currency = data.currency?.text || "฿";
-            if (data.promotion.type === 1) {
-                promoText = `${data.promotion.value}% off: ${data.promotion.promoCode}`;
-            } else if (data.promotion.type === 2) {
-                promoText = `${currency}${data.promotion.value} off: ${data.promotion.promoCode}`;
-            }
-                }
-
                 return {
                     id: docSnap.id,
                     shopName: data.shopName || "",
@@ -179,7 +171,7 @@ export default function BeautyHome({ navigation }) {
                     neighborhood: data.neighborhood || data.city || "",
             shopTypeId: data.shopType?.id,
             shopTypeLabel: "Beauty",
-            promoText,
+            promoLabel: data.promoLabel || null,
                     booking_id: data.booking_id || "",
         };
     }, []);
@@ -219,16 +211,6 @@ export default function BeautyHome({ navigation }) {
                 const galleryImage = Array.isArray(data.GalleryPictureShop) && data.GalleryPictureShop.length > 0
                     ? data.GalleryPictureShop[0]
                     : data.cover_Shop_Img || data.logo_Shop_Img || null;
-                
-                let promoText = null;
-                if (data.promotion?.doubleDay && data.promotion?.promoCode) {
-                    const currency = data.currency?.text || "฿";
-                    if (data.promotion.type === 1) {
-                        promoText = `${data.promotion.value}% off: ${data.promotion.promoCode}`;
-                    } else if (data.promotion.type === 2) {
-                        promoText = `${currency}${data.promotion.value} off: ${data.promotion.promoCode}`;
-                    }
-                }
 
                 return {
                     id: docSnap.id,
@@ -238,7 +220,7 @@ export default function BeautyHome({ navigation }) {
                     totalReviews: data.google_infos?.user_ratings_total || 0,
                     neighborhood: data.neighborhood || data.city || "",
                     shopTypeId: data.shopType?.id,
-                    promoText,
+                    promoLabel: data.promoLabel || null,
                     booking_id: data.booking_id || "",
                     // Keep raw data for filtering
                     _highlightType: data.highlight?.type || null,
@@ -400,6 +382,12 @@ export default function BeautyHome({ navigation }) {
         goToScreen(navigation, "Shops", { filter: sectionId, shopType: 1 });
     }, [navigation]);
 
+    const onPressBanner = useCallback((banner) => {
+        if (banner?.shopId) {
+            goToScreen(navigation, "Venue", { shopId: banner.shopId });
+        }
+    }, [navigation]);
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await fetchAllData();
@@ -473,10 +461,10 @@ export default function BeautyHome({ navigation }) {
                 <View style={styles.sloganContainer}>
                     <Text style={styles.sloganText}>Today's the day</Text>
                     <Text style={styles.sloganText}>to treat yourself</Text>
-                </View>
+            </View>
                 <View style={styles.searchBox}>
                     <View style={styles.categoryInputContainer}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.searchInput} 
                             onPress={() => setCategoryDropdownVisible(!categoryDropdownVisible)}
                             activeOpacity={0.9}
@@ -486,7 +474,7 @@ export default function BeautyHome({ navigation }) {
                             <View style={styles.chevronDown} />
                         </TouchableOpacity>
                         {renderCategoryDropdown()}
-                    </View>
+        </View>
                     <View style={styles.searchInput}>
                         <Image source={locationIcon} style={styles.inputIcon} resizeMode="contain" />
                         <Text style={styles.inputText} numberOfLines={1}>{locationName}</Text>
@@ -510,7 +498,7 @@ export default function BeautyHome({ navigation }) {
                 <TouchableOpacity style={styles.moreButton} onPress={onPressFn}>
                     <Text style={styles.moreText}>More</Text>
                     <View style={styles.chevronRight} />
-                        </TouchableOpacity>
+        </TouchableOpacity>
             )}
         </View>
     );
@@ -561,10 +549,11 @@ export default function BeautyHome({ navigation }) {
 
         return (
             <View key={`banner-${index}`} style={styles.bannerContainer}>
-                <TouchableOpacity onPress={() => {
-                    const redirectUrl = getBannerUrl(banner, 'redirect');
-                    // Handle redirect if needed
-                }}>
+                <TouchableOpacity 
+                    onPress={() => onPressBanner(banner)}
+                    activeOpacity={0.9}
+                    disabled={!banner?.shopId}
+                >
                     <Image source={{ uri: imageUrl }} style={styles.bannerImage} resizeMode="cover" />
                 </TouchableOpacity>
             </View>
@@ -754,20 +743,29 @@ const styles = StyleSheet.create({
     },
     promoBadge: {
         position: "absolute",
-        top: 9,
-        left: 9,
-        right: 9,
-        backgroundColor: primaryColor,
-        borderRadius: 8,
-        paddingVertical: 8,
-        paddingHorizontal: 11,
+        top: 6,
+        left: 6,
         flexDirection: "row",
         alignItems: "center",
+        backgroundColor: primaryColor,
+        borderRadius: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        gap: 6,
+        alignSelf: "flex-start",
+        maxWidth: 120,
+    },
+    promoIconBadge: {
+        width: 16,
+        height: 10,
+        tintColor: "#FFFFFF",
     },
     promoBadgeText: {
+        flex: 1,
         color: "#FFFFFF",
-        fontSize: 11,
+        fontSize: 10,
         fontWeight: "500",
+        textAlign: "center",
     },
     cardInfo: {
         minHeight: CARD_INFO_HEIGHT,

@@ -333,6 +333,7 @@ export default function BeautySearch({ navigation, route }) {
                         id: docSnap.id,
                         imageUrl: bannerData.url?.mobile || bannerData.url?.desktop || null,
                         redirectUrl: bannerData.url?.redirect || null,
+                        shopId: data.shopId || null,
                     };
                 }).filter(b => b.imageUrl);
                 
@@ -570,10 +571,12 @@ export default function BeautySearch({ navigation, route }) {
 
     const onPressBanner = useCallback((banner) => {
         trackBannerClick(banner.id);
-        if (banner.redirectUrl) {
+        if (banner.shopId) {
+            goToScreen(navigation, "Venue", { shopId: banner.shopId });
+        } else if (banner.redirectUrl) {
             Linking.openURL(banner.redirectUrl);
         }
-    }, [trackBannerClick]);
+    }, [navigation, trackBannerClick]);
 
     // Request location permission and get GPS position
     const requestLocationPermission = useCallback(async () => {
@@ -700,6 +703,7 @@ export default function BeautySearch({ navigation, route }) {
                             <TouchableOpacity
                                 style={styles.bannerContainer}
                                 onPress={() => onPressBanner(item)}
+                                disabled={!item.shopId && !item.redirectUrl}
                                 activeOpacity={0.9}
                             >
                                 <Image source={{ uri: item.imageUrl }} style={styles.bannerImage} resizeMode="cover" />

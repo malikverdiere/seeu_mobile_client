@@ -33,7 +33,7 @@ import {
 
 // ============ CONSTANTS ============
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const GALLERY_HEIGHT = 267;
+const GALLERY_HEIGHT = 300;
 const SERVICE_CARD_HEIGHT = 104;
 const TEAM_AVATAR_SIZE = 52;
 const REVIEW_BOX_SIZE = 131;
@@ -137,20 +137,14 @@ const transformService = (docSnap, lang) => {
 };
 
 /**
- * Transform raw Firestore category data to CategoryType
- * Based on doc: id, categoryName, color, Description, priority, title?[lang].text
+ * Transform raw Firestore category document to CategoryType
+ * Based on doc: id, categoryName, color, Description, priority
  */
-const transformCategory = (data, lang) => {
-    // Get localized title
-    const getLocalizedTitle = () => {
-        if (data.title?.[lang]?.text) return data.title[lang].text;
-        if (data.title?.en?.text) return data.title.en.text;
-        return data.categoryName || data.name || "";
-    };
-    
+const transformCategory = (docSnap) => {
+    const data = docSnap.data();
     return {
-        id: data.id || data.categoryId,
-        name: getLocalizedTitle(),
+        id: docSnap.id,
+        name: data.categoryName || "",
         categoryName: data.categoryName || "",
         color: data.color || primaryColor,
         description: data.Description || "",
@@ -271,6 +265,30 @@ const filterCategoriesHasServices = (categories, services) => {
 };
 
 /**
+ * Get relative time description from date
+ */
+const getRelativeTime = (date) => {
+    if (!date) return "";
+    const now = new Date();
+    const diffInMs = now - date;
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) return "Today";
+    if (diffInDays === 1) return "Yesterday";
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    if (diffInDays < 30) {
+        const weeks = Math.floor(diffInDays / 7);
+        return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
+    }
+    if (diffInDays < 365) {
+        const months = Math.floor(diffInDays / 30);
+        return `${months} month${months > 1 ? 's' : ''} ago`;
+    }
+    const years = Math.floor(diffInDays / 365);
+    return `${years} year${years > 1 ? 's' : ''} ago`;
+};
+
+/**
  * Extract settingCalendar from shop data
  * Based on doc: interval_minutes, timeZone, displaySelectMember, hideAtVenue, deposit_enabled, etc.
  */
@@ -360,14 +378,18 @@ const CategoryTab = memo(({ category, isActive, onPress }) => (
 
 // Service Card Component
 const ServiceCard = memo(({ service, currency, isInCart, onAdd, onRemove, defaultIcon, lang }) => {
+    const hasImage = service.pictureUrl && service.pictureUrl.trim() !== "";
+    
     return (
         <View style={styles.serviceCard}>
-            <Image 
-                source={{ uri: service.pictureUrl || defaultIcon }} 
-                style={styles.serviceImage} 
-                resizeMode="cover"
-            />
-            <View style={styles.serviceInfo}>
+            {hasImage && (
+                <Image 
+                    source={{ uri: service.pictureUrl }} 
+                    style={styles.serviceImage} 
+                    resizeMode="cover"
+                />
+            )}
+            <View style={[styles.serviceInfo, !hasImage && styles.serviceInfoNoImage]}>
                 <Text style={styles.serviceName} numberOfLines={1}>{service.name}</Text>
                 <Text style={styles.serviceDescription} numberOfLines={2}>{service.description}</Text>
                 <View style={styles.serviceFooter}>
@@ -434,7 +456,7 @@ const ReviewPlatformBox = memo(({ platform, rating, reviewCount, isActive, onPre
 ));
 
 // Review Card Component
-const ReviewCard = memo(({ review, defaultIcon }) => {
+const ReviewCard = memo(({ review, defaultIcon, isSeeU = false }) => {
     const initial = (review.author_name || review.authorName)?.charAt(0)?.toUpperCase() || "U";
     const authorName = review.author_name || review.authorName || "User";
     const reviewText = review.text || "";
@@ -456,7 +478,7 @@ const ReviewCard = memo(({ review, defaultIcon }) => {
                         </View>
                     </View>
                 </View>
-                <Image source={googleLogo} style={styles.reviewPlatformIcon} resizeMode="contain" />
+                <Image source={isSeeU ? seeuLogo : googleLogo} style={styles.reviewPlatformIcon} resizeMode="contain" />
             </View>
             {reviewText.length > 0 && (
                 <View style={styles.reviewContent}>
@@ -526,8 +548,10 @@ export default function Venue({ navigation, route }) {
     const [promoCodes, setPromoCodes] = useState([]);
     
     // Reviews
-    const [reviews, setReviews] = useState([]);
-    const [showGoogleReviews, setShowGoogleReviews] = useState(true);
+    const [reviews, setReviews] = useState([]); // Google reviews
+    const [seeuReviews, setSeeuReviews] = useState([]); // SeeU reviews from Appointments
+    const [showGoogleReviews, setShowGoogleReviews] = useState(null); // null = auto-detect, true = Google, false = SeeU
+    const [googleReviewsPage, setGoogleReviewsPage] = useState(0); // Pagination for Google reviews (5 per page)
     
     // Opening hours
     const [openingHours, setOpeningHours] = useState([]);
@@ -542,6 +566,7 @@ export default function Venue({ navigation, route }) {
     // Loading states
     const [loadingShop, setLoadingShop] = useState(true);
     const [loadingServices, setLoadingServices] = useState(true);
+    const [loadingCategories, setLoadingCategories] = useState(true);
     const [loadingTeam, setLoadingTeam] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -617,22 +642,9 @@ export default function Venue({ navigation, route }) {
                 // Get opening hours display
                 setOpeningHours(getOpeningHoursDisplay(shopDoc, lang));
                 
-                // Extract promo codes
-                if (shopDoc.promoCodes && Array.isArray(shopDoc.promoCodes)) {
-                    setPromoCodes(shopDoc.promoCodes);
-                } else if (shopDoc.promotion?.promoCode) {
-                    setPromoCodes([{
-                        code: shopDoc.promotion.promoCode,
-                        type: shopDoc.promotion.type,
-                        value: shopDoc.promotion.value,
-                        minOrder: shopDoc.promotion.minOrder || 0,
-                    }]);
-                }
+                // Promo codes are fetched separately from PromoCodes collection
                 
-                // Extract Google reviews
-                if (shopDoc.google_infos?.reviews && Array.isArray(shopDoc.google_infos.reviews)) {
-                    setReviews(shopDoc.google_infos.reviews.slice(0, 5));
-                }
+                // Google reviews are fetched from GoogleReviews subcollection, not here
             }
         } catch (error) {
             console.error("Error fetching shop data:", error);
@@ -640,6 +652,36 @@ export default function Venue({ navigation, route }) {
             if (mountedRef.current) setLoadingShop(false);
         }
     }, [shopId, bookingId, lang]);
+
+    const fetchCategories = useCallback(async () => {
+        if (!shopId && !shopData?.id || services.length === 0) return;
+        setLoadingCategories(true);
+        
+        try {
+            const targetShopId = shopId || shopData?.id;
+            const categoriesRef = collection(firestore, "Shops", targetShopId, "ServiceCategories");
+            const q = query(categoriesRef, orderBy("priority", "asc"));
+            const snapshot = await getDocs(q);
+            
+            // Transform categories
+            const categoriesData = snapshot.docs.map(docSnap => transformCategory(docSnap));
+            
+            if (mountedRef.current) {
+                // Filter to only show categories with services
+                const filteredCategories = filterCategoriesHasServices(categoriesData, services);
+                setCategories(filteredCategories);
+                
+                // Select first category by default if none selected
+                if (filteredCategories.length > 0 && !selectedCategory) {
+                    setSelectedCategory(filteredCategories[0]);
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching categories:", error);
+        } finally {
+            if (mountedRef.current) setLoadingCategories(false);
+        }
+    }, [shopId, shopData?.id, services, selectedCategory]);
 
     const fetchServices = useCallback(async () => {
         if (!shopId && !shopData?.id) return;
@@ -656,32 +698,6 @@ export default function Venue({ navigation, route }) {
             
             if (mountedRef.current) {
                 setServices(servicesData);
-                
-                // Extract and transform categories from services
-                const uniqueCategories = [];
-                const categoryIds = new Set();
-                
-                servicesData.forEach(service => {
-                    if (service.categoryId && !categoryIds.has(service.categoryId)) {
-                        categoryIds.add(service.categoryId);
-                        uniqueCategories.push(transformCategory({
-                            id: service.categoryId,
-                            categoryName: service.categoryName,
-                        }, lang));
-                    }
-                });
-                
-                // Sort categories by priority
-                uniqueCategories.sort((a, b) => a.priority - b.priority);
-                
-                // Filter to only show categories with services
-                const filteredCategories = filterCategoriesHasServices(uniqueCategories, servicesData);
-                setCategories(filteredCategories);
-                
-                // Select first category by default
-                if (filteredCategories.length > 0) {
-                    setSelectedCategory(filteredCategories[0]);
-                }
             }
         } catch (error) {
             console.error("Error fetching services:", error);
@@ -689,6 +705,137 @@ export default function Venue({ navigation, route }) {
             if (mountedRef.current) setLoadingServices(false);
         }
     }, [shopId, shopData?.id, lang]);
+
+    const fetchGoogleReviews = useCallback(async () => {
+        if (!shopId && !shopData?.id) return;
+        
+        try {
+            const targetShopId = shopId || shopData?.id;
+            // Query directly from GoogleReviews subcollection - no where clause needed
+            const googleReviewsRef = collection(firestore, "Shops", targetShopId, "GoogleReviews");
+            
+            // Order by time descending to show most recent first
+            const q = query(
+                googleReviewsRef,
+                orderBy("time", "desc"),
+                limit(20)
+            );
+            
+            const snapshot = await getDocs(q);
+            
+            // Transform GoogleReviews to review format
+            const googleReviewsData = snapshot.docs
+                .map(docSnap => {
+                    const data = docSnap.data();
+                    
+                    return {
+                        id: docSnap.id,
+                        rating: data.rating || 0,
+                        text: data.text || "",
+                        author_name: data.author_name || "Anonymous",
+                        authorName: data.author_name || "Anonymous",
+                        profile_photo_url: data.profile_photo_url || null,
+                        relative_time_description: data.relative_time_description || "",
+                        relativeTime: data.relative_time_description || "",
+                        time: data.time || null,
+                    };
+                })
+                .filter(review => review !== null);
+            
+            if (mountedRef.current) {
+                setReviews(googleReviewsData);
+            }
+        } catch (error) {
+            console.error("Error fetching Google reviews:", error);
+        }
+    }, [shopId, shopData?.id]);
+
+    const fetchSeeUReviews = useCallback(async () => {
+        if (!shopId && !shopData?.id) return;
+        
+        try {
+            const targetShopId = shopId || shopData?.id;
+            // Query directly from ShopReviews subcollection - no where clause needed
+            const shopReviewsRef = collection(firestore, "Shops", targetShopId, "ShopReviews");
+            
+            // Order by createdAt descending to show most recent first
+            const q = query(
+                shopReviewsRef,
+                orderBy("createdAt", "desc"),
+                limit(20)
+            );
+            
+            const snapshot = await getDocs(q);
+            console.log("SeeU reviews fetched:", snapshot.docs.length);
+            
+            // Transform ShopReviews to review format
+            const seeuReviewsData = snapshot.docs
+                .map(docSnap => {
+                    const data = docSnap.data();
+                    
+                    const createdAt = data.createdAt || data.created_at;
+                    let dateObj = null;
+                    if (createdAt) {
+                        dateObj = createdAt.toDate ? createdAt.toDate() : (createdAt instanceof Date ? createdAt : null);
+                    }
+                    
+                    return {
+                        id: docSnap.id,
+                        rating: data.ratingNote || 0,
+                        text: data.ratingCommentary || "",
+                        author_name: data.clientId || "Anonymous",
+                        authorName: data.clientId || "Anonymous", // For ReviewCard compatibility
+                        clientId: data.clientId || null,
+                        createdAt: createdAt,
+                        relative_time_description: dateObj ? getRelativeTime(dateObj) : "",
+                        relativeTime: dateObj ? getRelativeTime(dateObj) : "", // For ReviewCard compatibility
+                    };
+                });
+            
+            console.log("SeeU reviews transformed:", seeuReviewsData.length);
+            if (mountedRef.current) {
+                setSeeuReviews(seeuReviewsData);
+            }
+        } catch (error) {
+            console.error("Error fetching SeeU reviews:", error);
+        }
+    }, [shopId, shopData?.id]);
+
+    const fetchPromoCodes = useCallback(async () => {
+        if (!shopId && !shopData?.id) return;
+        
+        try {
+            const targetShopId = shopId || shopData?.id;
+            // Query PromoCodes collection where shopId matches and status is ACTIVE (1)
+            const promoCodesRef = collection(firestore, "PromoCodes");
+            const q = query(
+                promoCodesRef,
+                where("shopId", "==", targetShopId),
+                where("status", "==", 1) // ACTIVE status
+            );
+            
+            const snapshot = await getDocs(q);
+            
+            // Transform PromoCode format to match PromoCodeCard expectations
+            const promoCodesData = snapshot.docs.map(docSnap => {
+                const data = docSnap.data();
+                return {
+                    code: data.code || "",
+                    type: data.discountType || 1, // 1 = percentage, 2 = fixed
+                    value: data.discountValue || 0,
+                    minOrder: data.minOrderValue || 0,
+                    id: docSnap.id,
+                    name: data.name || "",
+                };
+            });
+            
+            if (mountedRef.current) {
+                setPromoCodes(promoCodesData);
+            }
+        } catch (error) {
+            console.error("Error fetching promo codes:", error);
+        }
+    }, [shopId, shopData?.id]);
 
     const fetchTeam = useCallback(async () => {
         if (!shopId && !shopData?.id) return;
@@ -777,9 +924,9 @@ export default function Venue({ navigation, route }) {
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        await Promise.all([fetchShopData(), fetchServices(), fetchTeam()]);
+        await Promise.all([fetchShopData(), fetchServices(), fetchTeam(), fetchGoogleReviews(), fetchSeeUReviews(), fetchPromoCodes()]);
         if (mountedRef.current) setRefreshing(false);
-    }, [fetchShopData, fetchServices, fetchTeam]);
+    }, [fetchShopData, fetchServices, fetchTeam, fetchGoogleReviews, fetchSeeUReviews, fetchPromoCodes]);
 
     // ============ EFFECTS ============
     useEffect(() => {
@@ -792,9 +939,18 @@ export default function Venue({ navigation, route }) {
         if (shopData?.id || shopId) {
             fetchServices();
             fetchTeam();
+            fetchGoogleReviews();
+            fetchSeeUReviews();
+            fetchPromoCodes();
             addRecentlyViewed();
         }
-    }, [shopData?.id, shopId, fetchServices, fetchTeam, addRecentlyViewed]);
+    }, [shopData?.id, shopId, fetchServices, fetchTeam, fetchGoogleReviews, fetchSeeUReviews, fetchPromoCodes, addRecentlyViewed]);
+
+    useEffect(() => {
+        if (services.length > 0 && (shopData?.id || shopId)) {
+            fetchCategories();
+        }
+    }, [services, fetchCategories, shopData?.id, shopId]);
 
     // ============ RENDER GALLERY ============
     const renderGallery = () => {
@@ -837,7 +993,7 @@ export default function Venue({ navigation, route }) {
                 <View style={styles.shopDetails}>
                     <View style={styles.ratingRow}>
                         <Text style={styles.ratingText}>{rating.toFixed(1)}</Text>
-                        <StarRating rating={rating} size={8} />
+                        <StarRating rating={rating} size={14} />
                         <Text style={styles.reviewCountText}>({reviewCount} Reviews)</Text>
                     </View>
                     {openStatus && (
@@ -935,7 +1091,8 @@ export default function Venue({ navigation, route }) {
 
     // ============ RENDER TEAM ============
     const renderTeam = () => {
-        if (loadingTeam || team.length === 0) return null;
+        // Only display team section if displaySelectMember is true
+        if (!settingCalendar?.displaySelectMember || loadingTeam || team.length === 0) return null;
         
         return (
             <View style={styles.section}>
@@ -966,12 +1123,42 @@ export default function Venue({ navigation, route }) {
     const renderReviews = () => {
         const googleRating = shopData?.google_infos?.rating || 0;
         const googleCount = shopData?.google_infos?.user_ratings_total || 0;
-        const seeuRating = shopData?.seeuRating || 0;
-        const seeuCount = shopData?.seeuReviewCount || 0;
+        
+        // Calculate SeeU rating from fetched reviews
+        const seeuRating = seeuReviews.length > 0
+            ? seeuReviews.reduce((sum, r) => sum + (r.rating || 0), 0) / seeuReviews.length
+            : (shopData?.shopRating || 0);
+        const seeuCount = seeuReviews.length > 0 ? seeuReviews.length : (shopData?.shopRatingNumber || 0);
         
         const hasGoogleReviews = (googleRating > 0 || googleCount > 0);
-        const hasSeeUReviews = (seeuRating > 0 || seeuCount > 0);
-        const hasReviewsList = reviews && reviews.length > 0;
+        const hasGoogleReviewsList = reviews && reviews.length > 0;
+        const hasSeeUReviewsList = seeuReviews && seeuReviews.length > 0;
+        
+        // Only show SeeU button if there are actual reviews in the list
+        const hasSeeUReviews = hasSeeUReviewsList || (shopData?.shopRating > 0 || shopData?.shopRatingNumber > 0);
+        
+        // Auto-detect which reviews to show: SeeU first if available, else Google
+        const actualShowGoogle = showGoogleReviews === null 
+            ? !hasSeeUReviewsList && hasGoogleReviewsList
+            : showGoogleReviews;
+        
+        // Pagination for Google reviews (5 per page)
+        const GOOGLE_REVIEWS_PER_PAGE = 5;
+        const googleReviewsTotalPages = Math.ceil(reviews.length / GOOGLE_REVIEWS_PER_PAGE);
+        const googleReviewsStartIndex = googleReviewsPage * GOOGLE_REVIEWS_PER_PAGE;
+        const googleReviewsEndIndex = googleReviewsStartIndex + GOOGLE_REVIEWS_PER_PAGE;
+        const googleReviewsToDisplay = actualShowGoogle 
+            ? reviews.slice(googleReviewsStartIndex, googleReviewsEndIndex)
+            : seeuReviews;
+        
+        // For SeeU reviews, check the actual array length, not just hasSeeUReviewsList
+        const hasReviewsList = actualShowGoogle 
+            ? googleReviewsToDisplay.length > 0 
+            : (googleReviewsToDisplay && googleReviewsToDisplay.length > 0);
+        const reviewsToDisplay = googleReviewsToDisplay;
+        
+        const canGoPrevious = actualShowGoogle && googleReviewsPage > 0;
+        const canGoNext = actualShowGoogle && googleReviewsPage < googleReviewsTotalPages - 1;
         
         if (!hasGoogleReviews && !hasSeeUReviews && !hasReviewsList) {
             return null;
@@ -983,32 +1170,72 @@ export default function Venue({ navigation, route }) {
                 
                 {(hasGoogleReviews || hasSeeUReviews) && (
                     <View style={styles.reviewPlatforms}>
-                        {hasGoogleReviews && (
-                            <ReviewPlatformBox 
-                                platform="google"
-                                rating={googleRating}
-                                reviewCount={googleCount}
-                                isActive={showGoogleReviews}
-                                onPress={() => setShowGoogleReviews(true)}
-                                logo={googleLogo}
-                            />
-                        )}
                         {hasSeeUReviews && (
                             <ReviewPlatformBox 
                                 platform="seeu"
                                 rating={seeuRating}
                                 reviewCount={seeuCount}
-                                isActive={!showGoogleReviews}
-                                onPress={() => setShowGoogleReviews(false)}
+                                isActive={!actualShowGoogle}
+                                onPress={() => {
+                                    setShowGoogleReviews(false);
+                                    setGoogleReviewsPage(0); // Reset to first page
+                                }}
                                 logo={seeuLogo}
+                            />
+                        )}
+                        {hasGoogleReviews && (
+                            <ReviewPlatformBox 
+                                platform="google"
+                                rating={googleRating}
+                                reviewCount={googleCount}
+                                isActive={actualShowGoogle}
+                                onPress={() => {
+                                    setShowGoogleReviews(true);
+                                    setGoogleReviewsPage(0); // Reset to first page
+                                }}
+                                logo={googleLogo}
                             />
                         )}
                     </View>
                 )}
                 
-                {hasReviewsList && reviews.map((review, index) => (
-                    <ReviewCard key={index} review={review} defaultIcon={defaultIcon} />
-                ))}
+                {hasReviewsList && (
+                    <View style={styles.reviewsList}>
+                        {reviewsToDisplay.map((review, index) => (
+                            <ReviewCard 
+                                key={review.id || index} 
+                                review={review} 
+                                defaultIcon={defaultIcon}
+                                isSeeU={!actualShowGoogle}
+                            />
+                        ))}
+                        
+                        {/* Pagination arrows for Google reviews */}
+                        {actualShowGoogle && googleReviewsTotalPages > 1 && (
+                            <View style={styles.reviewsPagination}>
+                                {canGoPrevious && (
+                                    <TouchableOpacity 
+                                        style={styles.paginationArrow}
+                                        onPress={() => setGoogleReviewsPage(prev => prev - 1)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.chevronLeft} />
+                                    </TouchableOpacity>
+                                )}
+                                
+                                {canGoNext && (
+                                    <TouchableOpacity 
+                                        style={styles.paginationArrow}
+                                        onPress={() => setGoogleReviewsPage(prev => prev + 1)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.chevronRight} />
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
+                    </View>
+                )}
             </View>
         );
     };
@@ -1017,11 +1244,31 @@ export default function Venue({ navigation, route }) {
     const renderAbout = () => {
         if (!shopData) return null;
         
+        // Get about_us text based on language
+        const getAboutText = () => {
+            const aboutUs = shopData.about_us;
+            if (!aboutUs) return null;
+            
+            // Map app language to about_us keys
+            const langKey = lang === 'fr' ? 'fr' : lang === 'th' ? 'th' : 'en';
+            
+            // Try to get text in current language, fallback to English
+            if (aboutUs[langKey]?.text) {
+                return aboutUs[langKey].text;
+            }
+            if (aboutUs.en?.text) {
+                return aboutUs.en.text;
+            }
+            return null;
+        };
+        
+        const aboutText = getAboutText();
+        
         return (
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>{t('about', lang)} {shopData.shopName}</Text>
-                {shopData.description && (
-                    <Text style={styles.aboutText}>{shopData.description}</Text>
+                {aboutText && (
+                    <Text style={styles.aboutText}>{aboutText}</Text>
                 )}
                 
                 {/* Opening Hours */}
@@ -1167,6 +1414,15 @@ const styles = StyleSheet.create({
         transform: [{ rotate: "45deg" }],
         marginLeft: 3,
     },
+    chevronRight: {
+        width: 8,
+        height: 8,
+        borderRightWidth: 2,
+        borderTopWidth: 2,
+        borderColor: "#000000",
+        transform: [{ rotate: "45deg" }],
+        marginRight: 3,
+    },
     galleryCounter: {
         position: "absolute",
         bottom: 10,
@@ -1210,8 +1466,8 @@ const styles = StyleSheet.create({
         color: "#FFD700",
     },
     ratingText: {
-        fontSize: 12,
-        fontWeight: "500",
+        fontSize: 15,
+        fontWeight: "600",
         color: "#000000",
     },
     reviewCountText: {
@@ -1220,7 +1476,7 @@ const styles = StyleSheet.create({
         color: "#000000",
     },
     openStatusText: {
-        fontSize: 12,
+        fontSize: 14,
         fontWeight: "500",
     },
     openText: {
@@ -1352,13 +1608,16 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         gap: 6,
     },
+    serviceInfoNoImage: {
+        marginLeft: 0,
+    },
     serviceName: {
         fontSize: 14,
         fontWeight: "600",
         color: "#000000",
     },
     serviceDescription: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: "500",
         color: "#000000",
     },
@@ -1486,6 +1745,9 @@ const styles = StyleSheet.create({
         fontWeight: "500",
         color: "#000000",
     },
+    reviewsList: {
+        gap: 10,
+    },
     reviewCard: {
         backgroundColor: "#FFFFFF",
         borderWidth: 1,
@@ -1546,12 +1808,32 @@ const styles = StyleSheet.create({
         fontSize: 8,
         fontWeight: "500",
         color: "#000000",
-        lineHeight: 12,
+        lineHeight: 12
+        ,
     },
     reviewReadMore: {
         fontSize: 10,
         fontWeight: "500",
         color: "#5E98FF",
+    },
+    
+    // Reviews Pagination
+    reviewsPagination: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        marginTop: 10,
+        gap: 10,
+    },
+    paginationArrow: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#FFFFFF",
+        borderWidth: 1,
+        borderColor: "#D9D9D9",
+        justifyContent: "center",
+        alignItems: "center",
     },
     
     // About

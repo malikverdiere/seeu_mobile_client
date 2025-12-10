@@ -204,7 +204,7 @@ export default function BeautyHome({ navigation }) {
                         promoText = `${currency}${data.promotion.value} off: ${data.promotion.promoCode}`;
                     }
                 }
-                
+
                 return {
                     id: docSnap.id,
                     shopName: data.shopName || "",
@@ -220,7 +220,7 @@ export default function BeautyHome({ navigation }) {
                     _hasPromo: data.promotion?.doubleDay === true,
                 };
             });
-            
+
             // Prefetch first images
             allShops.slice(0, 6).forEach(shop => {
                 if (shop.galleryImage) Image.prefetch(shop.galleryImage);
@@ -287,7 +287,7 @@ export default function BeautyHome({ navigation }) {
             }
         } catch (error) {
             if (mountedRef.current) setLoadingRecent(false);
-        }
+            }
     }, [transformShopDoc]);
 
     // Banners

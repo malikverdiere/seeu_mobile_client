@@ -427,22 +427,22 @@ export default function Home({ navigation }) {
             
             const shops = snapshot.docs.map(docSnap => {
                 const data = docSnap.data();
-                const galleryImage = Array.isArray(data.GalleryPictureShop) && data.GalleryPictureShop.length > 0
+                    const galleryImage = Array.isArray(data.GalleryPictureShop) && data.GalleryPictureShop.length > 0
                     ? data.GalleryPictureShop[0] : null;
                 
                 // Get translated shop type label using helper
                 const shopTypeLabel = getShopTypeLabel(data.shopType?.id, lang);
-                
-                return {
-                    id: docSnap.id,
-                    shopName: data.shopName || "",
-                    galleryImage: galleryImage || data.cover_Shop_Img || data.logo_Shop_Img || null,
-                    rating: data.google_infos?.rating || 0,
-                    totalReviews: data.google_infos?.user_ratings_total || 0,
-                    address: data.address || "",
-                    neighborhood: data.neighborhood || "",
+                    
+                    return {
+                        id: docSnap.id,
+                        shopName: data.shopName || "",
+                        galleryImage: galleryImage || data.cover_Shop_Img || data.logo_Shop_Img || null,
+                        rating: data.google_infos?.rating || 0,
+                        totalReviews: data.google_infos?.user_ratings_total || 0,
+                        address: data.address || "",
+                        neighborhood: data.neighborhood || "",
                     shopTypeLabel,
-                    promoText: data.activePromoText || null,
+                        promoText: data.activePromoText || null,
                 };
             });
             
@@ -479,11 +479,11 @@ export default function Home({ navigation }) {
                     const cachedBanners = cacheSnapshot.docs.map(docSnap => {
                         const data = docSnap.data();
                         const bannerData = data.banner?.[lang] || data.banner?.en || data.banner?.fr || {};
-                        return {
-                            id: docSnap.id,
-                            imageUrl: bannerData.url?.mobile || bannerData.url?.desktop || null,
-                            redirectUrl: bannerData.url?.redirect || null,
-                            priority: data.priority || 0,
+                return {
+                    id: docSnap.id,
+                    imageUrl: bannerData.url?.mobile || bannerData.url?.desktop || null,
+                    redirectUrl: bannerData.url?.redirect || null,
+                    priority: data.priority || 0,
                         };
                     }).filter(b => b.imageUrl);
                     setBeautyBanners(cachedBanners);
@@ -905,8 +905,8 @@ export default function Home({ navigation }) {
                     windowSize={3}
                     removeClippedSubviews
                     getItemLayout={getItemLayoutUpcoming}
-                />
-            </View>
+                                    />
+                                </View>
         );
     };
 
@@ -994,7 +994,7 @@ export default function Home({ navigation }) {
                     removeClippedSubviews
                     getItemLayout={getItemLayoutTrending}
                 />
-            </View>
+                                        </View>
         );
     };
 
@@ -1002,19 +1002,19 @@ export default function Home({ navigation }) {
     return (
         <View style={styles.container}>
             <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-                {renderHeader()}
-                <ScrollView
-                    contentContainerStyle={{ paddingBottom: bottomTarSpace + insets.bottom }}
+            {renderHeader()}
+            <ScrollView
+                contentContainerStyle={{ paddingBottom: bottomTarSpace + insets.bottom }}
                     refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-                    showsVerticalScrollIndicator={false}
-                >
-                    {renderGreetingSection()}
-                    {user && renderUpcomingSection()}
-                    {renderBannerSection()}
-                    {renderMyShopSection()}
-                    {user && renderMyGiftsSection()}
-                    {renderBeautyTrendingSection()}
-                </ScrollView>
+                showsVerticalScrollIndicator={false}
+            >
+                {renderGreetingSection()}
+                {user && renderUpcomingSection()}
+                {renderBannerSection()}
+                {renderMyShopSection()}
+                {user && renderMyGiftsSection()}
+                {renderBeautyTrendingSection()}
+            </ScrollView>
             </SafeAreaView>
 
             {(isFocused && user) && <NFCRead navigation={navigation} modalBoxInfos={modalBox.openBoxInfos} />}

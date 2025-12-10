@@ -84,9 +84,15 @@ const FilterChip = memo(({ label, icon, isActive, onPress }) => (
 
 // ============ SERVICE CARD COMPONENT ============
 const ServiceCard = memo(({ service, currency, lang }) => {
-    const durationText = service.duration ? `${Math.floor(service.duration / 60)}h${service.duration % 60 > 0 ? (service.duration % 60) : ''}` : '';
+    const durationText = service.durationText || (service.duration ? `${Math.floor(service.duration / 60)}h${service.duration % 60 > 0 ? (service.duration % 60) : ''}` : '');
     const hasPromo = service.promoPrice && service.promoPrice < service.price;
-    const serviceName = service.title_service?.[lang]?.text || service.name || "";
+    
+    // Get service name with language fallback
+    const serviceName = service.title_service?.[lang]?.text 
+        || service.title_service?.en?.text 
+        || service.title_service?.fr?.text 
+        || service.title_service?.th?.text
+        || service.name || "";
 
     return (
         <View style={styles.serviceCard}>
@@ -344,19 +350,40 @@ export default function BeautySearch({ navigation, route }) {
         }
     }, []);
 
-    // ============ FETCH FEATURED SERVICES (as per doc section 6) ============
-    const fetchFeaturedServices = useCallback(async (shopId) => {
-        try {
-            // const servicesRef = collection(db, 'Shops', shopId, 'Services');
-            // const q = query(servicesRef, where('featured', '==', true));
-            const servicesRef = collection(firestore, "Shops", shopId, "Services");
-            const q = query(servicesRef, where("featured", "==", true));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        } catch (error) {
-            return [];
-        }
-    }, []);
+    // ============ TRANSFORM FEATURED SERVICE ============
+    const transformFeaturedService = useCallback((serviceData) => {
+        // Get service name based on language
+        const serviceName = serviceData.title_service?.[lang]?.text 
+            || serviceData.title_service?.en?.text 
+            || serviceData.title_service?.fr?.text 
+            || serviceData.title_service?.th?.text
+            || serviceData.name || "";
+        
+        // Get service description based on language
+        const serviceDescription = serviceData.description_service?.[lang]?.text 
+            || serviceData.description_service?.en?.text 
+            || serviceData.description_service?.fr?.text 
+            || serviceData.description_service?.th?.text
+            || serviceData.description || "";
+        
+        return {
+            id: serviceData.id || "",
+            name: serviceData.name || "",
+            title_service: serviceData.title_service || {},
+            description_service: serviceData.description_service || {},
+            description: serviceDescription,
+            price: serviceData.price || 0,
+            promoPrice: serviceData.promotionPrice || null,
+            duration: serviceData.duration || 0,
+            durationText: serviceData.durationText || "",
+            categoryId: serviceData.categoryId || "",
+            colorService: serviceData.colorService || "#000000",
+            people: serviceData.people || 0,
+            priority: serviceData.priority || 0,
+            featured: serviceData.featured || false,
+            hidden_for_client: serviceData.hidden_for_client || false,
+        };
+    }, [lang]);
 
     // ============ TRANSFORM SHOP DOC ============
     const transformShopDoc = useCallback((docSnap) => {
@@ -364,6 +391,13 @@ export default function BeautySearch({ navigation, route }) {
         const galleryImage = Array.isArray(data.GalleryPictureShop) && data.GalleryPictureShop.length > 0
             ? data.GalleryPictureShop[0]
             : data.cover_Shop_Img || data.logo_Shop_Img || null;
+
+        // Extract featuredServices from shop document
+        const featuredServices = Array.isArray(data.featuredServices) 
+            ? data.featuredServices
+                .filter(service => service && service.id && !service.hidden_for_client)
+                .map(transformFeaturedService)
+            : [];
 
         return {
             id: docSnap.id,
@@ -380,8 +414,9 @@ export default function BeautySearch({ navigation, route }) {
             lng: data.coordinate?.lng || data.lng,
             adPosition: data.adPosition || 999,
             _lastRate: data.google_infos?.user_ratings_total || 0,
+            featuredServices,
         };
-    }, []);
+    }, [transformFeaturedService]);
 
     // ============ FETCH SHOPS (Section 3 + Section 10 Mode RATING) with Cache ============
     const fetchShops = useCallback(async (isLoadMore = false, forceRefresh = false) => {
@@ -447,17 +482,10 @@ export default function BeautySearch({ navigation, route }) {
             if (!mountedRef.current) return;
 
             // Transform shops + filter booking_id != null côté client
+            // featuredServices are now included in transformShopDoc directly from shop document
             const shops = snap.docs
                 .filter(doc => doc.data().booking_id != null)
                 .map(transformShopDoc);
-
-            // Fetch featured services for each shop (in parallel)
-            const shopsWithServices = await Promise.all(
-                shops.map(async (shop) => {
-                    const services = await fetchFeaturedServices(shop.id);
-                    return { ...shop, featuredServices: services };
-                })
-            );
 
             // Update last doc for pagination (this.lastRate = lastVis)
             const lastVis = snap.docs.at(-1) ?? null;
@@ -465,17 +493,17 @@ export default function BeautySearch({ navigation, route }) {
 
             // Set state
             if (isLoadMore) {
-                setShops(prev => [...prev, ...shopsWithServices]);
+                setShops(prev => [...prev, ...shops]);
             } else {
-                setShops(shopsWithServices);
+                setShops(shops);
                 // Mettre en cache seulement lors du chargement initial
                 cacheRef.current[cacheKey] = {
-                    shops: shopsWithServices,
+                    shops: shops,
                     hasMore: shops.length === PAGE_SIZE,
                     lastDoc: lastVis,
                 };
                 // Prefetch first images
-                shopsWithServices.slice(0, 3).forEach(s => s.galleryImage && Image.prefetch(s.galleryImage));
+                shops.slice(0, 3).forEach(s => s.galleryImage && Image.prefetch(s.galleryImage));
             }
 
             // hasMore = shops.length === limitCount
@@ -488,7 +516,7 @@ export default function BeautySearch({ navigation, route }) {
                 setLoadingMore(false);
             }
         }
-    }, [categoryType, category, selectedCategory, filters, transformShopDoc, fetchFeaturedServices]);
+    }, [categoryType, category, selectedCategory, filters, transformShopDoc]);
 
 
     // ============ INITIAL LOAD ============

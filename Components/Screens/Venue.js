@@ -18,6 +18,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NoUserContext, UserContext, goToScreen, primaryColor, setAppLang, traductor, getShopTypeLabel, bottomTarSpace } from '../AGTools';
+import ServiceModal from '../ServiceModal';
 import { AuthContext } from '../Login';
 import { firestore } from '../../firebase.config';
 import {
@@ -60,7 +61,7 @@ const translations = {
     closed: { en: "Closed", fr: "Fermé", th: "ปิด" },
     until: { en: "until", fr: "jusqu'à", th: "จนถึง" },
     readMore: { en: "Read more", fr: "Lire plus", th: "อ่านเพิ่มเติม" },
-    continue: { en: "Continue", fr: "Continuer", th: "ดำเนินการต่อ" },
+    makeAppointment: { en: "Make an appointment", fr: "Prendre rendez-vous", th: "จองนัดหมาย" },
     noMin: { en: "No min.", fr: "Pas de minimum", th: "ไม่มีขั้นต่ำ" },
     off: { en: "off", fr: "de réduction", th: "ส่วนลด" },
     monday: { en: "Monday", fr: "Lundi", th: "จันทร์" },
@@ -154,7 +155,7 @@ const transformCategory = (docSnap) => {
 
 /**
  * Transform raw Firestore team member data to TeamMemberType
- * Based on doc: id, first_name/last_name, email, phone, picture, role, etc.
+ * Based on doc: id, first_name/last_name, email, phone, photo_url, job_title, services[]
  */
 const transformTeamMember = (docSnap) => {
     const data = docSnap.data();
@@ -175,11 +176,12 @@ const transformTeamMember = (docSnap) => {
         firstName: data.first_name || data.firstName || "",
         lastName: data.last_name || data.lastName || "",
         email: data.email || null,
-        phone: data.phone || null,
-        picture: data.picture || data.photo || data.image || null,
-        role: data.role || data.specialty || data.position || "",
-        // Availability data (if needed for booking)
-        availability: data.availability || null,
+        phone: data.phone_number || data.phone || null,
+        picture: data.photo_url || null,
+        role: data.job_title || "",
+        bio: data.bio || null,
+        // IDs of services this member can perform (for filtering)
+        services: Array.isArray(data.services) ? data.services : [],
     };
 };
 
@@ -377,11 +379,15 @@ const CategoryTab = memo(({ category, isActive, onPress }) => (
 ));
 
 // Service Card Component
-const ServiceCard = memo(({ service, currency, isInCart, onAdd, onRemove, defaultIcon, lang }) => {
+const ServiceCard = memo(({ service, currency, isInCart, onPress, defaultIcon, lang }) => {
     const hasImage = service.pictureUrl && service.pictureUrl.trim() !== "";
     
     return (
-        <View style={styles.serviceCard}>
+        <TouchableOpacity 
+            style={styles.serviceCard}
+            onPress={() => onPress(service)}
+            activeOpacity={0.9}
+        >
             {hasImage && (
                 <Image 
                     source={{ uri: service.pictureUrl }} 
@@ -406,18 +412,14 @@ const ServiceCard = memo(({ service, currency, isInCart, onAdd, onRemove, defaul
                             <Text style={styles.serviceDuration}> • {service.durationText}</Text>
                         )}
                     </View>
-                    <TouchableOpacity 
-                        style={[styles.addButton, isInCart && styles.addButtonActive]}
-                        onPress={() => isInCart ? onRemove(service) : onAdd(service)}
-                        activeOpacity={0.8}
-                    >
+                    <View style={[styles.addButton, isInCart && styles.addButtonActive]}>
                         <Text style={[styles.addButtonText, isInCart && styles.addButtonTextActive]}>
-                            {isInCart ? "−" : "+"}
+                            {isInCart ? "✓" : "+"}
                         </Text>
-                    </TouchableOpacity>
+                    </View>
                 </View>
             </View>
-        </View>
+        </TouchableOpacity>
     );
 });
 
@@ -560,6 +562,10 @@ export default function Venue({ navigation, route }) {
     // Cart
     const [cart, setCart] = useState([]);
     
+    // Service Modal
+    const [serviceModalVisible, setServiceModalVisible] = useState(false);
+    const [selectedService, setSelectedService] = useState(null);
+    
     // Gallery
     const [currentGalleryIndex, setCurrentGalleryIndex] = useState(1);
     
@@ -592,7 +598,7 @@ export default function Venue({ navigation, route }) {
     }, [services, selectedCategory]);
 
     const cartItemIds = useMemo(() => cart.map(item => item.id), [cart]);
-    const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.promotionPrice || item.price), 0), [cart]);
+    const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.totalPrice || item.promotionPrice || item.price), 0), [cart]);
     
     // Check if team selection should be shown (from settingCalendar)
     const shouldShowTeamSelection = useMemo(() => {
@@ -883,29 +889,68 @@ export default function Venue({ navigation, route }) {
         goToScreen(navigation, "goBack");
     }, [navigation]);
 
-    const onAddToCart = useCallback((service) => {
-        setCart(prev => [...prev, service]);
+    // Service Modal handlers
+    const onPressService = useCallback((service) => {
+        setSelectedService(service);
+        setServiceModalVisible(true);
     }, []);
 
-    const onRemoveFromCart = useCallback((service) => {
-        setCart(prev => prev.filter(item => item.id !== service.id));
+    const onCloseServiceModal = useCallback(() => {
+        setServiceModalVisible(false);
+        setSelectedService(null);
+    }, []);
+
+    const onAddServiceFromModal = useCallback(({ service, selectedOption, selectedAddOns, selectedMember, totalPrice, totalDuration }) => {
+        // Create cart item with all selected data
+        const cartItem = {
+            id: service.id,
+            name: service.name,
+            description: service.description,
+            duration: totalDuration,
+            durationText: service.durationText,
+            price: service.price,
+            promotionPrice: service.promotionPrice,
+            categoryId: service.categoryId,
+            pictureUrl: service.pictureUrl,
+            selectedOption,
+            selectedAddOns,
+            teamMemberId: selectedMember?.id || null,
+            teamMemberName: selectedMember?.name || null,
+            totalPrice,
+        };
+
+        // Navigate to BeautyServices with the cart item + pass services & categories to avoid re-fetching
+        goToScreen(navigation, "BeautyServices", { 
+            shopId: shopId || shopData?.id, 
+            shopData: shopData,
+            cart: [cartItem],
+            settingCalendar: settingCalendar,
+            services: services,
+            categories: categories,
+            team: team,
+        });
+    }, [navigation, shopId, shopData, settingCalendar, services, categories, team]);
+
+    const onRemoveServiceFromModal = useCallback((serviceId) => {
+        setCart(prev => prev.filter(item => item.id !== serviceId));
     }, []);
 
     const onSelectTeamMember = useCallback((member) => {
         setSelectedTeamMember(prev => prev?.id === member.id ? null : member);
     }, []);
 
-    const onPressContinue = useCallback(() => {
-        if (cart.length === 0) return;
-        
-        goToScreen(navigation, "Booking", { 
+    const onPressMakeAppointment = useCallback(() => {
+        // Pass services & categories to avoid re-fetching in BeautyServices
+        goToScreen(navigation, "BeautyServices", { 
             shopId: shopId || shopData?.id, 
-            services: cart,
             shopData: shopData,
-            selectedMember: selectedTeamMember,
+            cart: [],
             settingCalendar: settingCalendar,
+            services: services,
+            categories: categories,
+            team: team,
         });
-    }, [navigation, shopId, shopData, cart, selectedTeamMember, settingCalendar]);
+    }, [navigation, shopId, shopData, settingCalendar, services, categories, team]);
 
     const onPressLocation = useCallback(() => {
         if (!shopData?.address) return;
@@ -1078,8 +1123,7 @@ export default function Venue({ navigation, route }) {
                             service={service}
                             currency={currency}
                             isInCart={cartItemIds.includes(service.id)}
-                            onAdd={onAddToCart}
-                            onRemove={onRemoveFromCart}
+                            onPress={onPressService}
                             defaultIcon={defaultIcon}
                             lang={lang}
                         />
@@ -1316,27 +1360,13 @@ export default function Venue({ navigation, route }) {
     const renderBottomBar = () => {
         return (
             <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
-                <View style={styles.bottomBarContent}>
-                    <TouchableOpacity style={styles.cartButton} activeOpacity={0.9}>
-                        <View style={styles.cartIconContainer}>
-                            <Text style={styles.cartIcon}>🛒</Text>
-                        </View>
-                        {cart.length > 0 && (
-                            <View style={styles.cartBadge}>
-                                <Text style={styles.cartBadgeText}>{cart.length}</Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity 
-                        style={[styles.continueButton, cart.length === 0 && styles.continueButtonDisabled]}
-                        onPress={onPressContinue}
-                        activeOpacity={0.9}
-                        disabled={cart.length === 0}
-                    >
-                        <Text style={styles.continueButtonText}>{t('continue', lang)}</Text>
-                    </TouchableOpacity>
-                </View>
+                <TouchableOpacity 
+                    style={styles.makeAppointmentButton}
+                    onPress={onPressMakeAppointment}
+                    activeOpacity={0.9}
+                >
+                    <Text style={styles.makeAppointmentButtonText}>{t('makeAppointment', lang)}</Text>
+                </TouchableOpacity>
             </View>
         );
     };
@@ -1364,6 +1394,21 @@ export default function Venue({ navigation, route }) {
             </ScrollView>
             
             {renderBottomBar()}
+
+            {/* Service Detail Modal */}
+            <ServiceModal
+                visible={serviceModalVisible}
+                service={selectedService}
+                onClose={onCloseServiceModal}
+                onAddService={onAddServiceFromModal}
+                onRemoveService={onRemoveServiceFromModal}
+                currency={currency}
+                isInCart={selectedService ? cartItemIds.includes(selectedService.id) : false}
+                existingCartService={selectedService ? cart.find(item => item.id === selectedService.id) : null}
+                teamMembers={team}
+                showMemberSelection={settingCalendar?.displaySelectMember || false}
+                defaultIcon={defaultIcon}
+            />
         </View>
     );
 }
@@ -1951,60 +1996,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 24,
         paddingTop: 9,
     },
-    bottomBarContent: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 15,
-    },
-    cartButton: {
-        width: 57,
-        height: 44,
-        backgroundColor: "#FFFFFF",
-        borderWidth: 1.3,
-        borderColor: primaryColor,
-        borderRadius: 13,
-        justifyContent: "center",
-        alignItems: "center",
-        position: "relative",
-    },
-    cartIconContainer: {
-        width: 30,
-        height: 30,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    cartIcon: {
-        fontSize: 20,
-    },
-    cartBadge: {
-        position: "absolute",
-        top: -5,
-        right: -5,
-        width: 21,
-        height: 21,
-        borderRadius: 11,
-        backgroundColor: primaryColor,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    cartBadgeText: {
-        fontSize: 14,
-        fontWeight: "500",
-        color: "#FFFFFF",
-    },
-    continueButton: {
+    makeAppointmentButton: {
         flex: 1,
-        height: 44,
+        height: 48,
         backgroundColor: primaryColor,
-        borderRadius: 13,
+        borderRadius: 14,
         justifyContent: "center",
         alignItems: "center",
     },
-    continueButtonDisabled: {
-        opacity: 0.5,
-    },
-    continueButtonText: {
-        fontSize: 14,
+    makeAppointmentButtonText: {
+        fontSize: 15,
         fontWeight: "600",
         color: "#FFFFFF",
     },

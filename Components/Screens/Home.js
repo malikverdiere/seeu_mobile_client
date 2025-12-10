@@ -162,9 +162,9 @@ const TrendingCard = memo(({ item, onPress, defaultIcon }) => {
                     source={{ uri: item.galleryImage || defaultIcon }} 
                     resizeMode="cover"
                 />
-                {item.promoText && (
+                {item.promoLabel && (
                     <View style={styles.promoBadge}>
-                        <Text style={styles.promoBadgeText} numberOfLines={1}>{item.promoText}</Text>
+                        <Text style={styles.promoBadgeText} numberOfLines={1}>{item.promoLabel}</Text>
                     </View>
                 )}
             </View>
@@ -442,7 +442,7 @@ export default function Home({ navigation }) {
                         address: data.address || "",
                         neighborhood: data.neighborhood || "",
                     shopTypeLabel,
-                        promoText: data.activePromoText || null,
+                        promoLabel: data.promoLabel || null,
                 };
             });
             
@@ -638,7 +638,7 @@ export default function Home({ navigation }) {
     }, [navigation]);
 
     const onPressTrendingShop = useCallback((item) => {
-        goToScreen(navigation, "Shop", { shopId: item.id });
+        goToScreen(navigation, "Venue", { shopId: item.id });
     }, [navigation]);
 
     const onPressGift = useCallback((item) => {
@@ -1381,19 +1381,24 @@ const styles = StyleSheet.create({
     },
     promoBadge: {
         position: "absolute",
-        top: 8,
-        left: 8,
-        right: 8,
+        top: 6,
+        left: 6,
+        flexDirection: "row",
+        alignItems: "center",
         backgroundColor: primaryColor,
         borderRadius: 8,
         paddingVertical: 6,
         paddingHorizontal: 10,
-        alignItems: "center",
+        gap: 6,
+        alignSelf: "flex-start",
+        maxWidth: 120,
     },
     promoBadgeText: {
+        flex: 1,
         color: "#FFFFFF",
         fontSize: 10,
         fontWeight: "500",
+        textAlign: "center",
     },
     trendingInfo: {
         backgroundColor: "#FFFFFF",

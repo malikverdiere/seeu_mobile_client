@@ -202,7 +202,7 @@ const ServiceRow = memo(({
         ? selectedMember.first_name || selectedMember.name 
         : (isStylist ? t('anyStylist', lang) : t('anyProfessional', lang));
 
-    const memberPhoto = selectedMember?.photo_url;
+    const memberPhoto = selectedMember?.picture;
 
     return (
         <View style={[styles.serviceRow, !isLast && styles.serviceRowBorder]}>
@@ -304,8 +304,8 @@ const MemberSelectionView = memo(({
                         activeOpacity={isDisabled ? 1 : 0.7}
                         disabled={isDisabled}
                     >
-                        {member.photo_url ? (
-                            <Image source={{ uri: member.photo_url }} style={styles.memberOptionPhoto} />
+                        {member.picture ? (
+                            <Image source={{ uri: member.picture }} style={styles.memberOptionPhoto} />
                         ) : (
                             <View style={styles.memberOptionPhotoPlaceholder}>
                                 <Text style={styles.memberOptionPhotoText}>
@@ -489,18 +489,16 @@ export default function BeautyProfessional({ navigation, route }) {
     const onPressContinue = useCallback(() => {
         if (cart.length === 0) return;
         
-        // TODO: Navigate to Time page
-        // For now, just log
-        console.log('[BeautyProfessional] Continue with guests:', guests);
-        
-        // goToScreen(navigation, "BeautyTime", {
-        //     shopId,
-        //     shopData,
-        //     settingCalendar,
-        //     guests,
-        //     team,
-        // });
-    }, [guests, cart, shopId, shopData, settingCalendar, team]);
+        goToScreen(navigation, "BeautyTime", {
+            shopId,
+            shopData,
+            settingCalendar,
+            guests,
+            team,
+            services: initialServices,
+            categories: initialCategories,
+        });
+    }, [navigation, guests, cart, shopId, shopData, settingCalendar, team, initialServices, initialCategories]);
 
     // Cart Modal handlers
     const onOpenCartModal = useCallback(() => {

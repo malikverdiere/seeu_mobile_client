@@ -18,7 +18,9 @@ export const auth = getAuth(app);
 export const firestore = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
+export const functionsAsiaSoutheast = getFunctions(app, 'asia-southeast1');
 export const messaging = getMessaging(app);
 export const onHttpsCallable = (name) => httpsCallable(functions, name);
+export const onHttpsCallableAsiaSoutheast = (name) => httpsCallable(functionsAsiaSoutheast, name);
 
 export default app;

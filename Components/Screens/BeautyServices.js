@@ -477,14 +477,15 @@ export default function BeautyServices({ navigation, route }) {
                 categories,
             });
         } else {
-            // Skip professional page, go directly to Time/Booking
-            goToScreen(navigation, "Booking", { 
+            // Skip professional page, go directly to Time selection
+            goToScreen(navigation, "BeautyTime", { 
                 shopId,
-                services: cart, // Flat cart for backwards compatibility
-                guests, // Full guests structure for booking
+                guests, // Full guests structure
                 shopData,
                 settingCalendar,
                 team,
+                services,
+                categories,
             });
         }
     }, [navigation, shopId, cart, guests, shopData, settingCalendar, team, services, categories]);

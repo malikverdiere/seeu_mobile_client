@@ -516,8 +516,67 @@ const GallerySkeleton = memo(() => (
     <View style={[styles.galleryContainer, styles.skeleton]} />
 ));
 
+const ShopInfoSkeleton = memo(() => (
+    <View style={styles.shopInfoContainer}>
+        {/* Shop name skeleton */}
+        <View style={[styles.skeletonLine, { width: '60%', height: 20 }]} />
+        
+        <View style={styles.shopDetails}>
+            {/* Rating skeleton */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.skeletonLine, { width: 30, height: 15 }]} />
+                <View style={[styles.skeletonLine, { width: 70, height: 14 }]} />
+                <View style={[styles.skeletonLine, { width: 80, height: 12 }]} />
+            </View>
+            
+            {/* Open status skeleton */}
+            <View style={[styles.skeletonLine, { width: '40%', height: 14 }]} />
+            
+            {/* Location skeleton */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={[styles.skeletonLine, { width: 9, height: 10 }]} />
+                <View style={[styles.skeletonLine, { width: '70%', height: 12 }]} />
+            </View>
+        </View>
+    </View>
+));
+
+const CategoryTabsSkeleton = memo(() => (
+    <View style={{ flexDirection: 'row', gap: 9 }}>
+        <View style={[styles.categoryTab, styles.skeleton, { width: 80, height: 28 }]} />
+        <View style={[styles.categoryTab, styles.skeleton, { width: 100, height: 28 }]} />
+        <View style={[styles.categoryTab, styles.skeleton, { width: 70, height: 28 }]} />
+    </View>
+));
+
 const ServiceSkeleton = memo(() => (
-    <View style={[styles.serviceCard, styles.skeleton, { height: SERVICE_CARD_HEIGHT }]} />
+    <View style={styles.serviceCard}>
+        {/* Image skeleton */}
+        <View style={[styles.serviceImage, styles.skeleton]} />
+        
+        <View style={styles.serviceInfo}>
+            {/* Service name skeleton */}
+            <View style={[styles.skeletonLine, { width: '70%', height: 14 }]} />
+            
+            {/* Description skeleton - 2 lines */}
+            <View style={{ gap: 4, marginTop: 6 }}>
+                <View style={[styles.skeletonLine, { width: '100%', height: 11 }]} />
+                <View style={[styles.skeletonLine, { width: '80%', height: 11 }]} />
+            </View>
+            
+            {/* Footer skeleton */}
+            <View style={styles.serviceFooter}>
+                <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                    {/* Price skeleton */}
+                    <View style={[styles.skeletonLine, { width: 60, height: 12 }]} />
+                    {/* Duration skeleton */}
+                    <View style={[styles.skeletonLine, { width: 40, height: 10 }]} />
+                </View>
+                {/* Add button skeleton */}
+                <View style={[styles.addButton, styles.skeleton]} />
+            </View>
+        </View>
+    </View>
 ));
 
 // ============ MAIN COMPONENT ============
@@ -1035,6 +1094,7 @@ export default function Venue({ navigation, route }) {
 
     // ============ RENDER SHOP INFO ============
     const renderShopInfo = () => {
+        if (loadingShop) return <ShopInfoSkeleton />;
         if (!shopData) return null;
         
         const rating = shopData.google_infos?.rating || shopData.rating || 0;
@@ -1097,25 +1157,31 @@ export default function Venue({ navigation, route }) {
             <View style={styles.section}>
                 <View style={styles.servicesHeader}>
                     <Text style={styles.sectionTitle}>{t('services', lang)}</Text>
-                    {categories.length > 1 && (
-                        <ScrollView 
-                            horizontal 
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.categoriesScroll}
-                        >
-                            {categories.map(cat => (
-                                <CategoryTab 
-                                    key={cat.id}
-                                    category={cat}
-                                    isActive={selectedCategory?.id === cat.id}
-                                    onPress={setSelectedCategory}
-                                />
-                            ))}
-                        </ScrollView>
+                    
+                    {/* Category tabs or skeleton */}
+                    {loadingCategories ? (
+                        <CategoryTabsSkeleton />
+                    ) : (
+                        categories.length > 1 && (
+                            <ScrollView 
+                                horizontal 
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.categoriesScroll}
+                            >
+                                {categories.map(cat => (
+                                    <CategoryTab 
+                                        key={cat.id}
+                                        category={cat}
+                                        isActive={selectedCategory?.id === cat.id}
+                                        onPress={setSelectedCategory}
+                                    />
+                                ))}
+                            </ScrollView>
+                        )
                     )}
                 </View>
                 
-                {selectedCategory && categories.length > 1 && (
+                {selectedCategory && categories.length > 1 && !loadingCategories && (
                     <Text style={styles.categoryTitle}>{selectedCategory.name}</Text>
                 )}
                 
@@ -1432,6 +1498,10 @@ const styles = StyleSheet.create({
     },
     skeleton: {
         backgroundColor: "#E8E8E8",
+    },
+    skeletonLine: {
+        backgroundColor: "#E8E8E8",
+        borderRadius: 4,
     },
     
     // Gallery

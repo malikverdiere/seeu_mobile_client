@@ -459,8 +459,8 @@ export default function BeautyHome({ navigation }) {
             <View style={styles.headerSpacer} />
         </View>
                 <View style={styles.sloganContainer}>
-                    <Text style={styles.sloganText}>Today's the day</Text>
-                    <Text style={styles.sloganText}>to treat yourself</Text>
+                    <Text style={styles.sloganText}>Today's the day to treat yourself</Text>
+
             </View>
                 <View style={styles.searchBox}>
                     <View style={styles.categoryInputContainer}>

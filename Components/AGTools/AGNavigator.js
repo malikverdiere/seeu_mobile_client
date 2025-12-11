@@ -41,6 +41,9 @@ import BeautySearch from "../Screens/BeautySearch";
 import Venue from "../Screens/Venue";
 import BeautyServices from "../Screens/BeautyServices";
 import BeautyProfessional from "../Screens/BeautyProfessional";
+import BeautyTime from "../Screens/BeautyTime";
+import BeautyCheckout from "../Screens/BeautyCheckout";
+import BeautyBookingSuccess from "../Screens/BeautyBookingSuccess";
 
 const underline = require("../img/underline.png")
 const tabActionImg = require("../img/btn/tabAction.png")
@@ -77,6 +80,9 @@ const tabNone = [
     "Venue",
     "BeautyServices",
     "BeautyProfessional",
+    "BeautyTime",
+    "BeautyCheckout",
+    "BeautyBookingSuccess",
 ]
 
 // changeTransition
@@ -198,6 +204,9 @@ export const StackHome = ({ navigation, route }) => {
             <Stack.Screen name="Venue" component={Venue} options={{headerShown:false}} />
             <Stack.Screen name="BeautyServices" component={BeautyServices} options={{headerShown:false}} />
             <Stack.Screen name="BeautyProfessional" component={BeautyProfessional} options={{headerShown:false}} />
+            <Stack.Screen name="BeautyTime" component={BeautyTime} options={{headerShown:false}} />
+            <Stack.Screen name="BeautyCheckout" component={BeautyCheckout} options={{headerShown:false}} />
+            <Stack.Screen name="BeautyBookingSuccess" component={BeautyBookingSuccess} options={{headerShown:false}} />
             <Stack.Screen name="CampaignsList" component={CampaignsList} options={{headerShown:false}} />
             <Stack.Screen name="Campaign" component={Campaign} options={{headerShown:false}} />
             <Stack.Screen name="TicketsQrCode" component={TicketsQrCode} options={{headerShown:false}} />

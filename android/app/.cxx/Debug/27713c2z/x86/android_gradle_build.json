@@ -1,0 +1,135 @@
+{
+  "buildFiles": [
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/@react-native-async-storage/async-storage/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/@react-native-community/datetimepicker/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/@react-native-community/geolocation/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-clarity/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-gesture-handler/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-localize/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-permissions/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-reanimated/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-screens/android/src/main/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-webview/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/Users/malik/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/.cxx/Debug/27713c2z/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/Users/malik/Library/Android/sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/.cxx/Debug/27713c2z/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "appmodules::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "appmodules",
+      "output": "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/build/intermediates/cxx/Debug/27713c2z/obj/x86/libappmodules.so",
+      "runtimeFiles": [
+        "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/build/intermediates/cxx/Debug/27713c2z/obj/x86/libreact_codegen_safeareacontext.so",
+        "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/build/intermediates/cxx/Debug/27713c2z/obj/x86/libreact_codegen_rnscreens.so",
+        "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/build/intermediates/cxx/Debug/27713c2z/obj/x86/libreact_codegen_rnsvg.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/146d3270a7ecdc01dfd3e5f57bdeca11/transformed/fbjni-0.6.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/ef7e31672c3eafbb777fe985733dd414/transformed/react-android-0.76.7-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/ef7e31672c3eafbb777fe985733dd414/transformed/react-android-0.76.7-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
+      ]
+    },
+    "react_codegen_Clarity::@046d2b3dc9c0da286085": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_Clarity"
+    },
+    "react_codegen_RNCGeolocationSpec::@1b959fcb56e23f7716ba": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_RNCGeolocationSpec"
+    },
+    "react_codegen_RNCWebViewSpec::@eb48929f9f7453740a6c": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_RNCWebViewSpec"
+    },
+    "react_codegen_RNDateTimePickerCGen::@59b70ddc31ba2f8ef1d2": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_RNDateTimePickerCGen"
+    },
+    "react_codegen_RNLocalizeSpec::@f3ba5298aff84514e205": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_RNLocalizeSpec"
+    },
+    "react_codegen_RNPermissionsSpec::@7ad697819b753921c957": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_RNPermissionsSpec"
+    },
+    "react_codegen_rnasyncstorage::@1596841e19ec5b9eeffe": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_rnasyncstorage"
+    },
+    "react_codegen_rngesturehandler_codegen::@39f233abcd2c728bc6ec": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_rngesturehandler_codegen"
+    },
+    "react_codegen_rnreanimated::@8afabad14bfffa3f8b9a": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_rnreanimated"
+    },
+    "react_codegen_rnscreens::@25bcbd507e98d3a854ad": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_rnscreens",
+      "output": "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/build/intermediates/cxx/Debug/27713c2z/obj/x86/libreact_codegen_rnscreens.so",
+      "runtimeFiles": [
+        "/Users/malik/.gradle/caches/8.10.2/transforms/ef7e31672c3eafbb777fe985733dd414/transformed/react-android-0.76.7-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/ef7e31672c3eafbb777fe985733dd414/transformed/react-android-0.76.7-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/146d3270a7ecdc01dfd3e5f57bdeca11/transformed/fbjni-0.6.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so"
+      ]
+    },
+    "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_rnsvg",
+      "output": "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/build/intermediates/cxx/Debug/27713c2z/obj/x86/libreact_codegen_rnsvg.so",
+      "runtimeFiles": [
+        "/Users/malik/.gradle/caches/8.10.2/transforms/ef7e31672c3eafbb777fe985733dd414/transformed/react-android-0.76.7-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/ef7e31672c3eafbb777fe985733dd414/transformed/react-android-0.76.7-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/146d3270a7ecdc01dfd3e5f57bdeca11/transformed/fbjni-0.6.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so"
+      ]
+    },
+    "react_codegen_safeareacontext::@7984cd80db47aa7b952a": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_safeareacontext",
+      "output": "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/android/app/build/intermediates/cxx/Debug/27713c2z/obj/x86/libreact_codegen_safeareacontext.so",
+      "runtimeFiles": [
+        "/Users/malik/.gradle/caches/8.10.2/transforms/146d3270a7ecdc01dfd3e5f57bdeca11/transformed/fbjni-0.6.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/ef7e31672c3eafbb777fe985733dd414/transformed/react-android-0.76.7-debug/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/Users/malik/.gradle/caches/8.10.2/transforms/ef7e31672c3eafbb777fe985733dd414/transformed/react-android-0.76.7-debug/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
+      ]
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/Users/malik/Library/Android/sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/Users/malik/Library/Android/sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/darwin-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

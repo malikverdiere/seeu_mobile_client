@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "rnscreens_autolinked_build",
+		"source" : "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/react-native-screens/android/src/main/jni"
+	}
+}

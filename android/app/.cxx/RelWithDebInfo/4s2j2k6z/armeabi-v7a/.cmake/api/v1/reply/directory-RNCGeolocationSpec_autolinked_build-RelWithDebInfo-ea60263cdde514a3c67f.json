@@ -1,0 +1,14 @@
+{
+	"backtraceGraph" : 
+	{
+		"commands" : [],
+		"files" : [],
+		"nodes" : []
+	},
+	"installers" : [],
+	"paths" : 
+	{
+		"build" : "RNCGeolocationSpec_autolinked_build",
+		"source" : "/Users/malik/Documents/SeeU/Application/seeu_mobile_client/node_modules/@react-native-community/geolocation/android/build/generated/source/codegen/jni"
+	}
+}

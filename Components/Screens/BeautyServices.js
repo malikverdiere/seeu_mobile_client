@@ -14,7 +14,11 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NoUserContext, UserContext, goToScreen, primaryColor, setAppLang } from '../AGTools';
 import ServiceModal from '../ServiceModal';
+import CartModal from '../CartModal';
 import { AuthContext } from '../Login';
+import { ShoppingCart } from '../img/svg';
+import useGuestController, { isServiceFullyBooked } from '../hooks/useGuestController';
+import { AddGuestModal, SelectGuestModal, GuestSelectorButton, AddGuestButton, NoMemberAlertModal } from '../GuestModals';
 import { firestore } from '../../firebase.config';
 import {
     collection,
@@ -135,41 +139,50 @@ const CategoryTab = memo(({ category, isActive, onPress }) => (
 ));
 
 // Service Card
-const ServiceCard = memo(({ service, currency, isInCart, onPress, lang }) => {
+const ServiceCard = memo(({ service, currency, isInCart, isFullyBooked, onPress, lang }) => {
     const hasImage = service.pictureUrl && service.pictureUrl.trim() !== "";
+    const isBlocked = isFullyBooked && !isInCart;
     
     return (
         <TouchableOpacity 
-            style={styles.serviceCard}
-            onPress={() => onPress(service)}
-            activeOpacity={0.9}
+            style={[styles.serviceCard, isBlocked && styles.serviceCardBlocked]}
+            onPress={() => onPress(service, isBlocked)}
+            activeOpacity={isBlocked ? 0.6 : 0.9}
         >
             {hasImage && (
                 <Image 
                     source={{ uri: service.pictureUrl }} 
-                    style={styles.serviceImage} 
+                    style={[styles.serviceImage, isBlocked && styles.serviceImageBlocked]} 
                     resizeMode="cover"
                 />
             )}
             <View style={[styles.serviceInfo, !hasImage && styles.serviceInfoNoImage]}>
-                <Text style={styles.serviceName} numberOfLines={1}>{service.name}</Text>
-                <Text style={styles.serviceDescription} numberOfLines={2}>{service.description}</Text>
+                <Text style={[styles.serviceName, isBlocked && styles.textBlocked]} numberOfLines={1}>{service.name}</Text>
+                <Text style={[styles.serviceDescription, isBlocked && styles.textBlocked]} numberOfLines={2}>{service.description}</Text>
                 <View style={styles.serviceFooter}>
                     <View style={styles.servicePriceContainer}>
                         {service.isPromotion ? (
                             <>
-                                <Text style={styles.serviceOriginalPrice}>{currency} {service.price}</Text>
-                                <Text style={styles.servicePromoPrice}>{currency} {service.promotionPrice}</Text>
+                                <Text style={[styles.serviceOriginalPrice, isBlocked && styles.textBlocked]}>{currency} {service.price}</Text>
+                                <Text style={[styles.servicePromoPrice, isBlocked && styles.textBlocked]}>{currency} {service.promotionPrice}</Text>
                             </>
                         ) : (
-                            <Text style={styles.servicePrice}>{currency} {service.price}</Text>
+                            <Text style={[styles.servicePrice, isBlocked && styles.textBlocked]}>{currency} {service.price}</Text>
                         )}
                         {service.durationText && (
-                            <Text style={styles.serviceDuration}> • {service.durationText}</Text>
+                            <Text style={[styles.serviceDuration, isBlocked && styles.textBlocked]}> • {service.durationText}</Text>
                         )}
                     </View>
-                    <View style={[styles.addButton, isInCart && styles.addButtonActive]}>
-                        <Text style={[styles.addButtonText, isInCart && styles.addButtonTextActive]}>
+                    <View style={[
+                        styles.addButton, 
+                        isInCart && styles.addButtonActive,
+                        isBlocked && styles.addButtonBlocked
+                    ]}>
+                        <Text style={[
+                            styles.addButtonText, 
+                            isInCart && styles.addButtonTextActive,
+                            isBlocked && styles.addButtonTextBlocked
+                        ]}>
                             {isInCart ? "✓" : "+"}
                         </Text>
                     </View>
@@ -214,11 +227,40 @@ export default function BeautyServices({ navigation, route }) {
     const [categories, setCategories] = useState(initialCategories);
     const [selectedCategory, setSelectedCategory] = useState(initialCategories.length > 0 ? initialCategories[0] : null);
     const [team, setTeam] = useState(initialTeam);
-    const [cart, setCart] = useState(initialCart);
+    
+    // Guest Controller - manages guests and their services (cart)
+    const guestController = useGuestController(initialCart);
+    const { 
+        guests,
+        activeGuestId,
+        cart, 
+        activeGuestCartIds: cartItemIds,
+        totalPrice: cartTotal,
+        totalServicesCount,
+        addService,
+        removeService,
+        isServiceInCart,
+        getServiceFromCart,
+        checkServiceAvailability,
+        setActiveGuest,
+        addGuest,
+        addGuestAndActivate,
+        removeGuest,
+        getActiveGuest,
+        getActiveGuestServices,
+    } = guestController;
     
     // Service Modal
     const [serviceModalVisible, setServiceModalVisible] = useState(false);
     const [selectedService, setSelectedService] = useState(null);
+    
+    // Cart Modal
+    const [cartModalVisible, setCartModalVisible] = useState(false);
+    
+    // Guest Modals
+    const [addGuestModalVisible, setAddGuestModalVisible] = useState(false);
+    const [selectGuestModalVisible, setSelectGuestModalVisible] = useState(false);
+    const [noMemberAlertVisible, setNoMemberAlertVisible] = useState(false);
     
     // Loading - start as false if we have pre-fetched data
     const [loading, setLoading] = useState(initialServices.length === 0);
@@ -230,8 +272,21 @@ export default function BeautyServices({ navigation, route }) {
 
     // ============ DERIVED VALUES ============
     const currency = useMemo(() => shopData?.currency?.text || "THB", [shopData]);
-    const cartItemIds = useMemo(() => cart.map(item => item.id), [cart]);
-    const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (item.totalPrice || item.promotionPrice || item.price), 0), [cart]);
+    
+    // Guest-related derived values
+    const activeGuest = useMemo(() => getActiveGuest(), [guests, activeGuestId]);
+    const activeGuestServices = useMemo(() => getActiveGuestServices(), [guests, activeGuestId]);
+    const activeGuestHasServices = activeGuestServices.length > 0;
+    const hasMultipleGuests = guests.length > 1; // More than just "Me"
+    
+    // Check if we can add a new guest:
+    // 1. All existing guests must have at least 1 service
+    // 2. Number of guests must be less than team members count
+    const allGuestsHaveServices = useMemo(() => {
+        return guests.every(g => g.services && g.services.length > 0);
+    }, [guests]);
+    const maxGuestsReached = guests.length >= team.length;
+    const canAddGuest = allGuestsHaveServices && !maxGuestsReached && team.length > 0;
 
     // Group services by category for SectionList
     const sections = useMemo(() => {
@@ -338,8 +393,13 @@ export default function BeautyServices({ navigation, route }) {
 
     // ============ HANDLERS ============
     const onPressBack = useCallback(() => {
-        goToScreen(navigation, "goBack");
-    }, [navigation]);
+        // Navigate back to Venue with current cart and guests state preserved
+        goToScreen(navigation, "Venue", {
+            shopId,
+            cart, // Flat cart for backwards compatibility
+            guests, // Full guests structure for future use
+        });
+    }, [navigation, shopId, cart, guests]);
 
     const onPressCategory = useCallback((category) => {
         setSelectedCategory(category);
@@ -356,7 +416,13 @@ export default function BeautyServices({ navigation, route }) {
         }
     }, [categoryIndexMap]);
 
-    const onPressService = useCallback((service) => {
+    const onPressService = useCallback((service, isBlocked = false) => {
+        // If service is blocked for this guest (not enough team members), show alert
+        if (isBlocked) {
+            // TODO: Show a proper alert modal
+            console.log('[BeautyServices] Service blocked - not enough team members available');
+            return;
+        }
         setSelectedService(service);
         setServiceModalVisible(true);
     }, []);
@@ -384,32 +450,107 @@ export default function BeautyServices({ navigation, route }) {
             totalPrice,
         };
 
-        setCart(prev => {
-            const existingIndex = prev.findIndex(item => item.id === service.id);
-            if (existingIndex >= 0) {
-                const updated = [...prev];
-                updated[existingIndex] = cartItem;
-                return updated;
-            }
-            return [...prev, cartItem];
-        });
-    }, []);
+        // Use guestController to add service
+        addService(cartItem);
+    }, [addService]);
 
     const onRemoveServiceFromModal = useCallback((serviceId) => {
-        setCart(prev => prev.filter(item => item.id !== serviceId));
-    }, []);
+        // Use guestController to remove service
+        removeService(serviceId);
+    }, [removeService]);
 
     const onPressContinue = useCallback(() => {
         if (cart.length === 0) return;
         
-        // Navigate to next step (will handle guests later)
-        goToScreen(navigation, "Booking", { 
-            shopId,
-            services: cart,
-            shopData,
-            settingCalendar,
-        });
-    }, [navigation, shopId, cart, shopData, settingCalendar]);
+        // Check if professional selection page should be shown
+        const displaySelectMemberAutoOpen = settingCalendar?.displaySelectMemberAutoOpen || false;
+        
+        if (displaySelectMemberAutoOpen && team.length > 0) {
+            // Navigate to Professional selection page
+            goToScreen(navigation, "BeautyProfessional", { 
+                shopId,
+                shopData,
+                settingCalendar,
+                guests, // Full guests structure
+                team,
+                services, // Pass services for reference
+                categories,
+            });
+        } else {
+            // Skip professional page, go directly to Time/Booking
+            goToScreen(navigation, "Booking", { 
+                shopId,
+                services: cart, // Flat cart for backwards compatibility
+                guests, // Full guests structure for booking
+                shopData,
+                settingCalendar,
+                team,
+            });
+        }
+    }, [navigation, shopId, cart, guests, shopData, settingCalendar, team, services, categories]);
+
+    // Cart Modal handlers
+    const onOpenCartModal = useCallback(() => {
+        setCartModalVisible(true);
+    }, []);
+
+    const onCloseCartModal = useCallback(() => {
+        setCartModalVisible(false);
+    }, []);
+
+    const onContinueFromCart = useCallback(() => {
+        setCartModalVisible(false);
+        onPressContinue();
+    }, [onPressContinue]);
+
+    // Guest Modal handlers
+    const onPressAddGuest = useCallback(() => {
+        // Check if all guests have at least one service
+        if (!allGuestsHaveServices) return;
+        
+        // Check if max guests reached (= team members count)
+        if (maxGuestsReached) {
+            setNoMemberAlertVisible(true);
+            return;
+        }
+        
+        setAddGuestModalVisible(true);
+    }, [allGuestsHaveServices, maxGuestsReached]);
+
+    const onCloseAddGuestModal = useCallback(() => {
+        setAddGuestModalVisible(false);
+    }, []);
+
+    const onConfirmAddGuest = useCallback(() => {
+        // Add new guest and switch to it immediately
+        addGuestAndActivate();
+        setAddGuestModalVisible(false);
+    }, [addGuestAndActivate]);
+
+    const onPressGuestSelector = useCallback(() => {
+        setSelectGuestModalVisible(true);
+    }, []);
+
+    const onCloseSelectGuestModal = useCallback(() => {
+        setSelectGuestModalVisible(false);
+    }, []);
+
+    const onSelectGuestFromModal = useCallback((guestId) => {
+        setActiveGuest(guestId);
+        setSelectGuestModalVisible(false);
+    }, [setActiveGuest]);
+
+    const onDeleteGuestFromModal = useCallback((guestId) => {
+        removeGuest(guestId);
+        // If we deleted the active guest, switch back to 'me'
+        if (guestId === activeGuestId) {
+            setActiveGuest('me');
+        }
+    }, [removeGuest, activeGuestId, setActiveGuest]);
+
+    const onCloseNoMemberAlert = useCallback(() => {
+        setNoMemberAlertVisible(false);
+    }, []);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
@@ -435,15 +576,21 @@ export default function BeautyServices({ navigation, route }) {
     }, []);
 
     // ============ RENDER ============
-    const renderItem = useCallback(({ item }) => (
-        <ServiceCard
-            service={item}
-            currency={currency}
-            isInCart={cartItemIds.includes(item.id)}
-            onPress={onPressService}
-            lang={lang}
-        />
-    ), [currency, cartItemIds, onPressService, lang]);
+    const renderItem = useCallback(({ item }) => {
+        // Check if service is fully booked for active guest
+        const isFullyBooked = !checkServiceAvailability(item.id, team);
+        
+        return (
+            <ServiceCard
+                service={item}
+                currency={currency}
+                isInCart={cartItemIds.includes(item.id)}
+                isFullyBooked={isFullyBooked}
+                onPress={onPressService}
+                lang={lang}
+            />
+        );
+    }, [currency, cartItemIds, onPressService, lang, checkServiceAvailability, team]);
 
     const renderSectionHeader = useCallback(({ section }) => (
         <SectionHeader title={section.title} />
@@ -464,15 +611,32 @@ export default function BeautyServices({ navigation, route }) {
             {/* Header */}
             <SafeAreaView edges={['top']} style={styles.headerSafeArea}>
                 <View style={styles.header}>
-                    <TouchableOpacity 
-                        style={styles.headerBackButton} 
-                        onPress={onPressBack}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <View style={styles.chevronLeft} />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>{t('services', lang)}</Text>
-                    <View style={styles.headerPlaceholder} />
+                    {/* Left side: Back + Title */}
+                    <View style={styles.headerLeft}>
+                        <TouchableOpacity 
+                            style={styles.headerBackButton} 
+                            onPress={onPressBack}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <View style={styles.chevronLeft} />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>{t('services', lang)}</Text>
+                    </View>
+                    
+                    {/* Right side: Guest Selector + Add Guest */}
+                    <View style={styles.headerRight}>
+                        {hasMultipleGuests && (
+                            <GuestSelectorButton
+                                activeGuest={activeGuest}
+                                hasGuests={hasMultipleGuests}
+                                onPress={onPressGuestSelector}
+                            />
+                        )}
+                        <AddGuestButton
+                            isActive={canAddGuest}
+                            onPress={onPressAddGuest}
+                        />
+                    </View>
                 </View>
                 
                 {/* Category Tabs */}
@@ -523,9 +687,10 @@ export default function BeautyServices({ navigation, route }) {
             {/* Bottom Bar - Same as Venue.js */}
             <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 8 }]}>
                 <View style={styles.bottomBarContent}>
-                    <TouchableOpacity style={styles.cartButton} activeOpacity={0.9}>
+                    {/* Cart Button */}
+                    <TouchableOpacity style={styles.cartButton} onPress={onOpenCartModal} activeOpacity={0.9}>
                         <View style={styles.cartIconContainer}>
-                            <Text style={styles.cartIcon}>🛒</Text>
+                            <ShoppingCart width={24} height={24} colorIcon={primaryColor} />
                         </View>
                         {cart.length > 0 && (
                             <View style={styles.cartBadge}>
@@ -534,6 +699,7 @@ export default function BeautyServices({ navigation, route }) {
                         )}
                     </TouchableOpacity>
                     
+                    {/* Continue Button */}
                     <TouchableOpacity 
                         style={[styles.continueButton, cart.length === 0 && styles.continueButtonDisabled]}
                         onPress={onPressContinue}
@@ -559,6 +725,43 @@ export default function BeautyServices({ navigation, route }) {
                 showMemberSelection={settingCalendar?.displaySelectMember || false}
                 defaultIcon={defaultIcon}
             />
+
+            {/* Cart Modal */}
+            <CartModal
+                visible={cartModalVisible}
+                onClose={onCloseCartModal}
+                onContinue={onContinueFromCart}
+                cart={cart}
+                guests={guests}
+                activeGuestId={activeGuestId}
+                currency={currency}
+                hideAtVenue={settingCalendar?.hideAtVenue || false}
+                onEditGuest={setActiveGuest}
+            />
+
+            {/* Add Guest Modal */}
+            <AddGuestModal
+                visible={addGuestModalVisible}
+                onClose={onCloseAddGuestModal}
+                onConfirm={onConfirmAddGuest}
+            />
+
+            {/* Select Guest Modal */}
+            <SelectGuestModal
+                visible={selectGuestModalVisible}
+                onClose={onCloseSelectGuestModal}
+                guests={guests}
+                activeGuestId={activeGuestId}
+                currency={currency}
+                onSelectGuest={onSelectGuestFromModal}
+                onDeleteGuest={onDeleteGuestFromModal}
+            />
+
+            {/* No Member Available Alert */}
+            <NoMemberAlertModal
+                visible={noMemberAlertVisible}
+                onClose={onCloseNoMemberAlert}
+            />
         </View>
     );
 }
@@ -580,8 +783,18 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         paddingVertical: 12,
+    },
+    headerLeft: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+    headerRight: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
     },
     headerBackButton: {
         width: 30,
@@ -759,6 +972,24 @@ const styles = StyleSheet.create({
         color: "#FFFFFF",
     },
     
+    // Blocked states (when not enough team members available)
+    serviceCardBlocked: {
+        opacity: 0.6,
+    },
+    serviceImageBlocked: {
+        opacity: 0.5,
+    },
+    textBlocked: {
+        color: "#999999",
+    },
+    addButtonBlocked: {
+        backgroundColor: "#CCCCCC",
+        borderColor: "#CCCCCC",
+    },
+    addButtonTextBlocked: {
+        color: "#FFFFFF",
+    },
+    
     // Bottom Bar - Same as Venue.js
     bottomBar: {
         position: "absolute",
@@ -811,6 +1042,19 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "500",
         color: "#FFFFFF",
+    },
+    addGuestIconButton: {
+        width: 44,
+        height: 44,
+        backgroundColor: "#FFFFFF",
+        borderWidth: 1.3,
+        borderColor: primaryColor,
+        borderRadius: 13,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    addGuestIconButtonDisabled: {
+        borderColor: "#CCCCCC",
     },
     continueButton: {
         flex: 1,

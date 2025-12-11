@@ -531,6 +531,7 @@ export default function Venue({ navigation, route }) {
     // Route params
     const shopId = route?.params?.shopId;
     const bookingId = route?.params?.booking_id;
+    const initialCart = route?.params?.cart || [];
 
     // ============ STATE ============
     // Shop data
@@ -559,8 +560,8 @@ export default function Venue({ navigation, route }) {
     const [openingHours, setOpeningHours] = useState([]);
     const [openStatus, setOpenStatus] = useState(null);
     
-    // Cart
-    const [cart, setCart] = useState([]);
+    // Cart - initialize with cart from params if coming back from BeautyServices
+    const [cart, setCart] = useState(initialCart);
     
     // Service Modal
     const [serviceModalVisible, setServiceModalVisible] = useState(false);
@@ -996,6 +997,13 @@ export default function Venue({ navigation, route }) {
             fetchCategories();
         }
     }, [services, fetchCategories, shopData?.id, shopId]);
+
+    // Update cart when coming back from BeautyServices with cart params
+    useEffect(() => {
+        if (route?.params?.cart && route.params.cart.length > 0) {
+            setCart(route.params.cart);
+        }
+    }, [route?.params?.cart]);
 
     // ============ RENDER GALLERY ============
     const renderGallery = () => {

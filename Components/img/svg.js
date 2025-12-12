@@ -169,6 +169,45 @@ export function TabAccount({ width = default_size, height = default_size, colorI
     </View>)
 }
 
+export function TabActivity({ width = default_size, height = default_size, colorIcon = "#fff" }) {
+    const stroke_width = 1.5
+    return (<View style={[{ flex: 1 }]}>
+        <Svg
+            width={width}
+            height={height}
+            viewBox="0 0 40 40"
+            fill="none"
+        >
+            <G transform="translate(9 9)">
+                <Path
+                    d="M6.40601 10.6501H13.972M6.40601 15.0941H10.638M6.40601 6.20605H13.972"
+                    stroke={colorIcon}
+                    strokeWidth={stroke_width}
+                    strokeLinecap="round"
+                />
+                <Path
+                    d="M11.276 20.75H6.386C3.272 20.75 0.75 18.242 0.75 15.15V6.35C0.75 3.258 3.274 0.75 6.386 0.75H13.912C17.026 0.75 19.548 3.258 19.548 6.35V10.75"
+                    stroke={colorIcon}
+                    strokeWidth={stroke_width}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+                <Path
+                    d="M16.828 20.75C18.994 20.75 20.75 18.994 20.75 16.828C20.75 14.662 18.994 12.906 16.828 12.906C14.662 12.906 12.906 14.662 12.906 16.828C12.906 18.994 14.662 20.75 16.828 20.75Z"
+                    stroke={colorIcon}
+                    strokeWidth={stroke_width}
+                />
+                <Path
+                    d="M18.788 16.828H17.044C16.924 16.828 16.826 16.73 16.826 16.61V15.302"
+                    stroke={colorIcon}
+                    strokeWidth={stroke_width}
+                    strokeLinecap="round"
+                />
+            </G>
+        </Svg>
+    </View>)
+}
+
 export function ShoppingCart({ width = 34, height = 34, colorIcon = "#6857E5" }) {
     return (
         <Svg

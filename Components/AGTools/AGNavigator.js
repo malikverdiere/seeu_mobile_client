@@ -5,7 +5,7 @@ import { getFocusedRouteNameFromRoute, useFocusEffect } from "@react-navigation/
 import { TransitionSpecs, createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TabAccount, TabHome, TabRewards, TabShops } from "../img/svg";
+import { TabAccount, TabActivity, TabHome, TabRewards, TabShops } from "../img/svg";
 import { primaryColor, secondaryColor } from "./AGGlobalVariables";
 import { traductor } from "./Traductor";
 import { AuthContext } from "../Login";
@@ -44,6 +44,8 @@ import BeautyProfessional from "../Screens/BeautyProfessional";
 import BeautyTime from "../Screens/BeautyTime";
 import BeautyCheckout from "../Screens/BeautyCheckout";
 import BeautyBookingSuccess from "../Screens/BeautyBookingSuccess";
+import BeautyBookingDetail from "../Screens/BeautyBookingDetail";
+import Activity from "../Screens/Activity";
 
 const underline = require("../img/underline.png")
 const tabActionImg = require("../img/btn/tabAction.png")
@@ -83,6 +85,7 @@ const tabNone = [
     "BeautyTime",
     "BeautyCheckout",
     "BeautyBookingSuccess",
+    "BeautyBookingDetail",
 ]
 
 // changeTransition
@@ -207,6 +210,7 @@ export const StackHome = ({ navigation, route }) => {
             <Stack.Screen name="BeautyTime" component={BeautyTime} options={{headerShown:false}} />
             <Stack.Screen name="BeautyCheckout" component={BeautyCheckout} options={{headerShown:false}} />
             <Stack.Screen name="BeautyBookingSuccess" component={BeautyBookingSuccess} options={{headerShown:false}} />
+            <Stack.Screen name="BeautyBookingDetail" component={BeautyBookingDetail} options={{headerShown:false}} />
             <Stack.Screen name="CampaignsList" component={CampaignsList} options={{headerShown:false}} />
             <Stack.Screen name="Campaign" component={Campaign} options={{headerShown:false}} />
             <Stack.Screen name="TicketsQrCode" component={TicketsQrCode} options={{headerShown:false}} />
@@ -221,33 +225,21 @@ export const StackHome = ({ navigation, route }) => {
             <Stack.Screen name="SetPersonnalInfos" component={SetPersonnalInfos} options={{headerShown:false}} />
             <Stack.Screen name="GeolocationView" component={GeolocationView} options={{headerShown:false}} />
             <Stack.Screen name="HomeHead" component={HomeHead} options={{headerShown:false}} />
+            <Stack.Screen name="Activity" component={Activity} options={{headerShown:false}} />
         </Stack.Navigator>
     )
 }
 
-export const StackRewards = ({ navigation, route }) => {
+export const StackActivity = ({ navigation, route }) => {
     const insets = useSafeAreaInsets()
     hideTabBar(navigation, route, insets)
     return (
-        <Stack.Navigator initialRouteName="Rewards" screenOptions={{}}>
+        <Stack.Navigator initialRouteName="Activity" screenOptions={{}}>
+            <Stack.Screen name="Activity" component={Activity} options={{headerShown:false}} />
+            <Stack.Screen name="BeautyBookingDetail" component={BeautyBookingDetail} options={{headerShown:false}} />
             <Stack.Screen name="Rewards" component={Rewards} options={{headerShown:false}} />
             <Stack.Screen name="SetPersonnalInfos" component={SetPersonnalInfos} options={{headerShown:false}} />
             <Stack.Screen name="Shop" component={Shop} options={{headerShown:false}} />
-        </Stack.Navigator>
-    )
-}
-
-export const StackShops = ({ navigation, route }) => {
-    const insets = useSafeAreaInsets()
-    hideTabBar(navigation, route, insets)
-    return (
-        <Stack.Navigator initialRouteName="Shops" screenOptions={{}}>
-            <Stack.Screen name="Shops" component={Shops} options={{headerShown:false}} />
-            <Stack.Screen name="Shop" component={Shop} options={{headerShown:false}} />
-            <Stack.Screen name="ShopReview" component={ShopReview} options={{headerShown:false}} />
-            <Stack.Screen name="Chat" component={Chat} options={{headerShown:false}} />
-            <Stack.Screen name="ChatRoom" component={ChatRoom} options={{headerShown:false}} />
-            <Stack.Screen name="SetPersonnalInfos" component={SetPersonnalInfos} options={{headerShown:false}} />
         </Stack.Navigator>
     )
 }
@@ -264,6 +256,21 @@ export const StackOffers = ({ navigation, route }) => {
             <Stack.Screen name="ChatRoom" component={ChatRoom} options={{headerShown:false}} />
             <Stack.Screen name="ShopReview" component={ShopReview} options={{headerShown:false}} />
             <Stack.Screen name="CampaignsList" component={CampaignsList} options={{headerShown:false}} />
+            <Stack.Screen name="GeolocationView" component={GeolocationView} options={{headerShown:false}} />
+        </Stack.Navigator>
+    )
+}
+
+export const StackShops = ({ navigation, route }) => {
+    const insets = useSafeAreaInsets()
+    hideTabBar(navigation, route, insets)
+    return (
+        <Stack.Navigator initialRouteName="Shops" screenOptions={{}}>
+            <Stack.Screen name="Shops" component={Shops} options={{headerShown:false}} />
+            <Stack.Screen name="Shop" component={Shop} options={{headerShown:false}} />
+            <Stack.Screen name="Chat" component={Chat} options={{headerShown:false}} />
+            <Stack.Screen name="ChatRoom" component={ChatRoom} options={{headerShown:false}} />
+            <Stack.Screen name="ShopReview" component={ShopReview} options={{headerShown:false}} />
             <Stack.Screen name="GeolocationView" component={GeolocationView} options={{headerShown:false}} />
         </Stack.Navigator>
     )
@@ -325,13 +332,13 @@ export const TabNavigator = () => {
                 })}
             />
             <Tab.Screen
-                name="Cadeaux"
-                component={StackRewards}
+                name="Activity"
+                component={StackActivity}
                 options={{
-                    tabBarLabel: traductor("Cadeaux"),
+                    tabBarLabel: traductor("Activity"),
                     tabBarIcon: ({ color, size, focused }) => (
                         <View style={[styles.itemContainer]}>
-                            <TabRewards width={tabIconsSize} height={tabIconsSize} colorIcon={color} />
+                            <TabActivity width={tabIconsSize} height={tabIconsSize} colorIcon={color} />
                         </View>
                     ),
                 }}
@@ -360,9 +367,9 @@ export const TabNavigator = () => {
             />
             <Tab.Screen
                 name="Coupon"
-                component={StackOffers}
+                component={StackShops}
                 options={{
-                    tabBarLabel: traductor("Coupon"),
+                    tabBarLabel: traductor("Loved"),
                     tabBarIcon: ({ color, size, focused }) => (
                         <View style={[styles.itemContainer]}>
                             <TabShops width={tabIconsSize} height={tabIconsSize} colorIcon={color} />
@@ -471,9 +478,9 @@ export const TabLoginNavigator = ({navigation}) => {
             />
             <Tab.Screen
                 name="Coupon"
-                component={StackOffers}
+                component={StackShops}
                 options={{
-                    tabBarLabel: traductor("Coupon"),
+                    tabBarLabel: traductor("Loved"),
                     tabBarIcon: ({ color, size, focused }) => (
                         <View style={[styles.itemContainer]}>
                             <TabShops width={tabIconsSize} height={tabIconsSize} colorIcon={color} />

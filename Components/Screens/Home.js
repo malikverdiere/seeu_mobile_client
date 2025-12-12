@@ -36,6 +36,7 @@ import NFCRead from '../NFCRead';
 import MarketingCampaignResume from './MarketingCampaignResume';
 import Notification, { addGift, addNotification, subTopic, updateRulesNotifReceived } from '../Notification';
 import { AuthContext } from '../Login';
+import UseRewards from '../UseRewards';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { 
     UpcomingSkeleton, 
@@ -62,6 +63,9 @@ const qrCodeBtnImg = require("../img/btn/qrCode.png");
 const notificationImg = require("../img/btn/notification.png");
 const beautyIcon = require("../img/cat02.png");
 const giftIcon = require("../img/reward.png");
+
+// Cache for bookings
+const bookingsCache = new Map();
 
 // ============ MEMOIZED COMPONENTS ============
 
@@ -294,6 +298,9 @@ export default function Home({ navigation }) {
     const [loadingBanners, setLoadingBanners] = useState(true);
     const [loadingUpcoming, setLoadingUpcoming] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [rewardSelectedVisible, setRewardSelectedVisible] = useState(false);
+    const [rewardSelected, setRewardSelected] = useState(null);
+    const [shopSelected, setShopSelected] = useState([]);
 
     const isFocused = useIsFocused();
     const modalBox = ModalBox();
@@ -397,9 +404,9 @@ export default function Home({ navigation }) {
 
     const getStatusLabel = useCallback((statut) => {
         switch (statut) {
-            case 1: return "Pending";
-            case 2: return "Getting there";
-            default: return "Booked";
+            case 1: return traductor("Booked"); // Réservé / Pending
+            case 2: return traductor("Confirmed"); // Confirmé
+            default: return traductor("Booked");
         }
     }, []);
 
@@ -525,15 +532,26 @@ export default function Home({ navigation }) {
             return;
         }
         
+        // Check cache first
+        const cacheKey = `upcoming_${currentUser.uid}`;
+        const cached = bookingsCache.get(cacheKey);
+        if (cached && Date.now() - cached.timestamp < 60000) { // Cache for 1 minute
+            setUpcomingBookings(cached.data);
+            setLoadingUpcoming(false);
+            return;
+        }
+        
         if (!mountedRef.current) return;
         setLoadingUpcoming(true);
         
         try {
             const now = new Date();
             
+            // Query only bookings with statut 1 (pending) or 2 (confirmed)
             const bookingsQuery = query(
                 collectionGroup(firestore, 'Booking'),
-                where('clientId', '==', currentUser.uid)
+                where('clientId', '==', currentUser.uid),
+                where('statut', 'in', [1, 2])  // Only fetch pending/confirmed
             );
             const snapshot = await getDocs(bookingsQuery);
             
@@ -550,10 +568,10 @@ export default function Home({ navigation }) {
                     appointmentDateTime.setHours(hours, minutes);
                 }
                 
+                // Filter by date (statut already filtered in query)
                 const isUpcoming = appointmentDateTime >= now;
-                const isActiveStatus = ![3, 4, 5, 6, 7].includes(data.statut);
                 
-                if (isUpcoming && isActiveStatus && data.booking_id) {
+                if (isUpcoming && data.booking_id) {
                     bookingIds.add(data.booking_id);
                     bookingsData.push({ doc: docSnap, data, appointmentDateTime });
                 }
@@ -605,6 +623,13 @@ export default function Home({ navigation }) {
             const limitedBookings = enrichedBookings.slice(0, 10);
             limitedBookings.forEach(b => delete b._sortDate);
             
+            // Cache the result
+            const cacheKey = `upcoming_${currentUser.uid}`;
+            bookingsCache.set(cacheKey, {
+                data: limitedBookings,
+                timestamp: Date.now(),
+            });
+            
             setUpcomingBookings(limitedBookings);
         } catch (error) {
             console.error("Error fetching upcoming bookings:", error);
@@ -622,6 +647,7 @@ export default function Home({ navigation }) {
         goToScreen(navigation, "GeolocationView", { from: "Accueil" });
     }, [navigation]);
     const onPressBeauty = useCallback(() => goToScreen(navigation, "BeautyHome"), [navigation]);
+    const onPressBeautySearch = useCallback(() => goToScreen(navigation, "BeautySearch"), [navigation]);
     const onPressAllShops = useCallback(() => goToScreen(navigation, "Shops"), [navigation]);
     const onCloseCampaignItem = useCallback(() => setCampaignPreview(false), []);
 
@@ -642,12 +668,22 @@ export default function Home({ navigation }) {
     }, [navigation]);
 
     const onPressGift = useCallback((item) => {
-        if (item.shopId) {
-            goToScreen(navigation, "Shop", { shopId: item.shopId });
-        } else {
-            goToScreen(navigation, "Rewards");
+        // Find shop data for this gift
+        const shop = currentShops.find(s => s?.docData?.userId === item.shopId) || 
+                     registeredShops.find(s => s?.docId === item.shopId);
+        
+        // Find reward/gift data
+        let rewardData = null;
+        if (item.type === 'reward') {
+            rewardData = rewardsByShop.find(r => r.docId === item.id || r.id === item.id);
+        } else if (item.type === 'gift') {
+            rewardData = gifts.find(g => g.docId === item.id || g.id === item.id);
         }
-    }, [navigation]);
+        
+        setShopSelected(shop ? [shop] : []);
+        setRewardSelected(rewardData);
+        setRewardSelectedVisible(true);
+    }, [navigation, currentShops, registeredShops, rewardsByShop, gifts]);
 
     const onPressBanner = useCallback((item) => {
         if (item.shopId) {
@@ -895,7 +931,7 @@ export default function Home({ navigation }) {
                 <SectionHeader 
                     title="Upcoming" 
                     count={upcomingBookings.length} 
-                    onPressMore={() => goToScreen(navigation, "Bookings")} 
+                    onPressMore={() => goToScreen(navigation, "Activity")} 
                 />
                 <FlatList
                     data={upcomingBookings}
@@ -926,7 +962,7 @@ export default function Home({ navigation }) {
 
         return (
             <View style={styles.section}>
-                <SectionHeader title="My shop" count={null} onPressMore={onPressAllShops} />
+                <SectionHeader title={`${traductor("Loved")} 💜`} count={null} onPressMore={onPressAllShops} />
                 {currentShops.length <= 0 ? (
                     <MyShopSkeleton count={3} />
                 ) : (
@@ -953,7 +989,7 @@ export default function Home({ navigation }) {
 
         return (
             <View style={styles.section}>
-                <SectionHeader title="My gifts" count={null} onPressMore={() => goToScreen(navigation, "Rewards")} />
+                <SectionHeader title="My gifts" count={null} onPressMore={() => goToScreen(navigation, "Activity", { initialTab: 'gift' })} />
                 <FlatList
                     data={allGifts}
                     horizontal
@@ -975,7 +1011,7 @@ export default function Home({ navigation }) {
         if (loadingTrending) {
             return (
                 <View style={styles.section}>
-                    <SectionHeader title="Beauty trending" count={null} onPressMore={onPressBeauty} />
+                    <SectionHeader title="Beauty trending" count={null} onPressMore={onPressBeautySearch} />
                     <TrendingSkeleton count={2} />
                 </View>
             );
@@ -984,7 +1020,7 @@ export default function Home({ navigation }) {
 
         return (
             <View style={styles.section}>
-                <SectionHeader title="Beauty trending" count={null} onPressMore={onPressBeauty} />
+                <SectionHeader title="Beauty trending" count={null} onPressMore={onPressBeautySearch} />
                 <FlatList
                     data={trendingShops}
                     horizontal
@@ -1042,6 +1078,15 @@ export default function Home({ navigation }) {
                     onConfirm={onConfirm}
                 />
             </Modal>
+
+            <UseRewards
+                navigation={navigation}
+                shop={shopSelected}
+                reward={rewardSelected}
+                visible={rewardSelectedVisible}
+                onVisible={setRewardSelectedVisible}
+                goToProfil={() => goToScreen(navigation, "SetPersonnalInfos")}
+            />
 
             {modalBox.renderBoxInfos("")}
         </View>

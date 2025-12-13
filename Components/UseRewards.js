@@ -31,18 +31,24 @@ export default function UseRewards({
     onRefresh,
     goToProfil,
 }) {
+    // Vérifier immédiatement si l'utilisateur est connecté
+    const currentUser = auth.currentUser
+    
     const [isLoading, setIsLoading] = useState(false)
     const [isValid, setIsValid] = useState(false)
     const [message, setMessage] = useState("")
     const [error, setError] = useState(0)
     const [registeredShopsData, setRegisteredShopsData] = useState(null)
-
-    const currentUser = auth.currentUser
-    const clientCollection = collection(firestore, "Clients")
-    const clientDocument = doc(clientCollection, currentUser.uid)
-    const rewardsHistoryCollection = collection(clientDocument, "RewardsHistory")
-    const registeredShopsCollection = collection(clientDocument, "RegisteredShops")
-    const giftsCollection = collection(clientDocument, "Gifts")
+    
+    // Ne rien faire si l'utilisateur n'est pas connecté - retourner null après les hooks
+    const isAuthenticated = !!currentUser
+    
+    // Collections Firebase (null si non connecté)
+    const clientCollection = isAuthenticated ? collection(firestore, "Clients") : null
+    const clientDocument = isAuthenticated && clientCollection ? doc(clientCollection, currentUser.uid) : null
+    const rewardsHistoryCollection = clientDocument ? collection(clientDocument, "RewardsHistory") : null
+    const registeredShopsCollection = clientDocument ? collection(clientDocument, "RegisteredShops") : null
+    const giftsCollection = clientDocument ? collection(clientDocument, "Gifts") : null
 
     const onPressClose = () => {
         setMessage("")
@@ -66,6 +72,7 @@ export default function UseRewards({
     }
 
     const addRewardsHistory = (prev, total) => {
+        if (!isAuthenticated || !rewardsHistoryCollection) return
         addDoc(rewardsHistoryCollection, {
             creatAt: new Date(),
             reward: reward?.docData,
@@ -78,6 +85,7 @@ export default function UseRewards({
     }
 
     const addGiftsHistory = () => {
+        if (!isAuthenticated || !rewardsHistoryCollection) return
         addDoc(rewardsHistoryCollection, {
             creatAt: new Date(),
             reward: reward?.docData,
@@ -89,6 +97,7 @@ export default function UseRewards({
     }
 
     const updatePoints = () => {
+        if (!isAuthenticated || !registeredShopsCollection) return
         setIsLoading(true)
         let prevPoints = Number(registeredShopsData?.docData?.points)
         let rewardPoints = Number(reward?.docData?.points)
@@ -145,6 +154,7 @@ export default function UseRewards({
     }
 
     const updateGifts = () => {
+        if (!isAuthenticated || !giftsCollection) return
         setIsLoading(true)
         if (registeredShopsData?.docData?.birthday
             && registeredShopsData?.docData?.firstName
@@ -169,6 +179,9 @@ export default function UseRewards({
     }
 
     useEffect(() => {
+        // Ne pas exécuter si l'utilisateur n'est pas connecté
+        if (!isAuthenticated || !registeredShopsCollection) return;
+        
         if (reward?.docData?.shopId) {
             const q = query(
                 registeredShopsCollection,
@@ -188,7 +201,12 @@ export default function UseRewards({
             
             return () => unSub();
         }
-    }, [reward])
+    }, [reward, isAuthenticated, registeredShopsCollection])
+
+    // Ne pas afficher le modal si l'utilisateur n'est pas connecté
+    if (!isAuthenticated) {
+        return null
+    }
 
     return (<Modal
         animationType="fade"

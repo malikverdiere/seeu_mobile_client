@@ -311,10 +311,10 @@ export default function Home({ navigation }) {
     const registeredShopsCollection = currentUser ? collection(firestore, "Clients", currentUser.uid, "RegisteredShops") : null;
 
     // Memoized derived data
-    const firstName = useMemo(() => 
-        user?.docData?.firstname || user?.docData?.firstName || "there", 
-        [user?.docData?.firstname, user?.docData?.firstName]
-    );
+    const firstName = useMemo(() => {
+        if (!user) return traductor("there");
+        return user?.docData?.firstname || user?.docData?.firstName || traductor("there");
+    }, [user, user?.docData?.firstname, user?.docData?.firstName]);
 
     const locationName = useMemo(() => 
         user?.docData?.geolocation?.city || noUserlocation?.city || "Localisation",
@@ -722,15 +722,18 @@ export default function Home({ navigation }) {
     // Refresh: just refetch, no reset
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
-        setShopsUpdate(true);
-        setPubsUpdate(true);
+        // Ces fonctions ne sont appelées que si l'utilisateur est connecté
+        if (user) {
+            setShopsUpdate(true);
+            setPubsUpdate(true);
+        }
         await Promise.all([
             fetchTrendingShops(),
             fetchBeautyBanners(),
-            fetchUpcomingBookings(),
+            ...(user ? [fetchUpcomingBookings()] : []),
         ]);
         setRefreshing(false);
-    }, [setShopsUpdate, setPubsUpdate, fetchTrendingShops, fetchBeautyBanners, fetchUpcomingBookings]);
+    }, [user, setShopsUpdate, setPubsUpdate, fetchTrendingShops, fetchBeautyBanners, fetchUpcomingBookings]);
 
     // ============ FLATLIST OPTIMIZATIONS ============
     const getItemLayoutUpcoming = useCallback((_, index) => ({
@@ -877,10 +880,9 @@ export default function Home({ navigation }) {
     // ============ SECTION RENDER FUNCTIONS ============
     const renderHeader = () => (
         <View style={styles.header}>
-            <TouchableOpacity style={styles.headerLeft} onPress={onPressGeolocation}>
-                <Text style={styles.headerLocationText}>{locationName}</Text>
-                <View style={styles.chevronDown} />
-            </TouchableOpacity>
+            <View style={styles.headerLeft}>
+                <Text style={styles.headerLocationText}>Bangkok</Text>
+            </View>
             <View style={styles.headerRight}>
                 {user && (
                     <>
@@ -958,7 +960,8 @@ export default function Home({ navigation }) {
     };
 
     const renderMyShopSection = () => {
-        if (!registeredShops || registeredShops.length === 0) return null;
+        // Section cachée si l'utilisateur n'est pas connecté
+        if (!user || !registeredShops || registeredShops.length === 0) return null;
 
         return (
             <View style={styles.section}>
@@ -1079,14 +1082,16 @@ export default function Home({ navigation }) {
                 />
             </Modal>
 
-            <UseRewards
-                navigation={navigation}
-                shop={shopSelected}
-                reward={rewardSelected}
-                visible={rewardSelectedVisible}
-                onVisible={setRewardSelectedVisible}
-                goToProfil={() => goToScreen(navigation, "SetPersonnalInfos")}
-            />
+            {currentUser && (
+                <UseRewards
+                    navigation={navigation}
+                    shop={shopSelected}
+                    reward={rewardSelected}
+                    visible={rewardSelectedVisible}
+                    onVisible={setRewardSelectedVisible}
+                    goToProfil={() => goToScreen(navigation, "SetPersonnalInfos")}
+                />
+            )}
 
             {modalBox.renderBoxInfos("")}
         </View>
